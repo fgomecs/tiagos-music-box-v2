@@ -59,12 +59,13 @@ def job_check(log, text):
     if not lib.deno_ok():
         log("Warning: deno not installed, YouTube downloads will likely fail")
     log("Updating yt-dlp ...")
+    JOB["progress"] = {"i": 0, "n": len(rows), "pct": 0, "name": "yt-dlp", "stage": "update", "t0": time.time()}
     ok, err = lib.update_ytdlp()
-    log("  ok" if ok else f"  update failed (continuing): {err}")
+    log(("  " + err) if ok and err else ("  ok" if ok else f"  update failed (continuing): {err}"))
     probed, failed = [], []
     for i, (url, name) in enumerate(rows, 1):
         log(f"Checking {i}/{len(rows)}: {name or url}")
-        JOB["progress"] = {"i": i - 1, "n": len(rows), "pct": 0, "name": name or url, "stage": "check"}
+        JOB["progress"] = {"i": i - 1, "n": len(rows), "pct": 0, "name": name or url, "stage": "check", "t0": time.time()}
         r = lib.probe(url)
         if "error" in r:
             log(f"  X {r['error']}")
@@ -322,6 +323,8 @@ input.nm{width:100%;background:#0f1324;color:var(--txt);border:1px solid var(--l
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5b8cff,#2ecc71);border-radius:99px;transition:width .4s}
 .bar.conv i{background:repeating-linear-gradient(45deg,#f5c542 0 10px,#e0a800 10px 20px);animation:mv 1s linear infinite;background-size:28px 28px}
 @keyframes mv{to{background-position:28px 0}}
+.bar.busy i{width:35%!important;background:linear-gradient(90deg,#5b8cff,#2ecc71);animation:slide 1.2s ease-in-out infinite alternate}
+@keyframes slide{from{margin-left:0}to{margin-left:65%}}
 .full{grid-column:1/-1}.hide{display:none}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
 label{color:var(--mut);font-size:13px}
 </style></head><body>
@@ -399,7 +402,9 @@ const api=(p,b)=>fetch(p,b?{method:'POST',headers:{'Content-Type':'application/j
 const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+let ticking=false;
 async function tick(){
+ if(ticking)return;ticking=true;
  try{
   const s=await api('/api/state'),p=s.player;
   $('pill').textContent=p.alive?(p.playing?'▶ playing':'● ready'):'player not running';
@@ -414,6 +419,7 @@ async function tick(){
   if(lastAlive===false&&p.alive)loadLib();lastAlive=p.alive;
   if(s.job.id&&(s.job.running||s.job.id!==lastJob))pollJob();
  }catch(e){$('pill').textContent='portal offline';$('pill').className='pill off';}
+ finally{ticking=false;}
 }
 function markCurrent(){document.querySelectorAll('#lib tr').forEach((tr,i)=>tr.classList.toggle('cur',i===curIndex));}
 async function loadLib(){
@@ -426,7 +432,7 @@ async function loadLib(){
  markCurrent();
 }
 let jobTimer=null;
-function watchJob(){clearInterval(jobTimer);jobTimer=setInterval(async()=>{const j=await pollJob();if(j&&!j.running){clearInterval(jobTimer);}},500);}
+function watchJob(){clearInterval(jobTimer);jobTimer=setInterval(async()=>{const j=await pollJob();if(j&&!j.running){clearInterval(jobTimer);}},700);}
 function cmd(c){api('/api/cmd',{cmd:c});}
 function restart(){api('/api/restart',{});$('pill').textContent='restarting…';}
 async function check(){
@@ -440,19 +446,24 @@ async function add(){
  if(!r.ok){$('jobmsg').textContent=r.error;return;}
  $('bAdd').disabled=true;watchJob();
 }
+let polling=false;
 async function pollJob(){
- let j;try{j=await api('/api/job');}catch(e){return null;}lastJob=j.id;
+ if(polling)return null;polling=true;
+ let j;try{j=await api('/api/job');}catch(e){return null;}finally{polling=false;}lastJob=j.id;
  $('log').classList.remove('hide');$('log').textContent=j.log.join('\n');$('log').scrollTop=1e9;
  const pr=j.progress;
  if(j.running&&pr){
   $('prog').classList.remove('hide');
-  const verb=pr.stage==='check'?'Checking':pr.stage==='convert'?'Converting':'Downloading';
-  const pct=pr.stage==='check'?0:pr.pct;
-  $('pName').textContent=`${verb} ${pr.i+1}/${pr.n}: ${pr.name}`;
-  $('pPct').textContent=pr.stage==='convert'?'converting…':(pr.stage==='check'?'':pct.toFixed(0)+'%');
+  const busy=pr.stage==='check'||pr.stage==='update';
+  const secs=pr.t0?Math.max(0,Math.round(Date.now()/1000-pr.t0)):0;
+  const verb={check:'Checking',update:'Updating',convert:'Converting'}[pr.stage]||'Downloading';
+  const pct=busy?0:pr.pct;
+  $('pName').textContent=pr.stage==='update'?'Updating downloader (yt-dlp)':`${verb} ${pr.i+1}/${pr.n}: ${pr.name}`;
+  $('pPct').textContent=busy?secs+'s':(pr.stage==='convert'?'converting…':pct.toFixed(0)+'%');
+  $('pBar').classList.toggle('busy',busy);
   $('pFill').style.width=(pr.stage==='convert'?100:pct)+'%';
   $('pBar').classList.toggle('conv',pr.stage==='convert');
-  const all=((pr.i+(pr.stage==='convert'?1:pct/100))/pr.n)*100;
+  const all=busy?(pr.i/pr.n)*100:((pr.i+(pr.stage==='convert'?1:pct/100))/pr.n)*100;
   $('pAllPct').textContent=all.toFixed(0)+'%';$('pAllFill').style.width=all+'%';
  }else if(!j.running){$('prog').classList.add('hide');}
  $('bCheck').disabled=j.running;$('jobmsg').textContent=j.running?(j.kind==='add'?'Downloading…':'Checking…'):'';
@@ -477,7 +488,7 @@ async function loadPhotos(){
 }
 async function delPhoto(f){if(confirm('Delete this photo?')){await api('/api/photos/delete',{name:f});loadPhotos();}}
 async function setLang(l){await api('/api/settings',{lang:l});loadPhotos();}
-loadLib();tick();loadPhotos();setInterval(tick,300);setInterval(loadLib,15000);setInterval(loadPhotos,20000);
+loadLib();tick();loadPhotos();setInterval(tick,1000);setInterval(loadLib,15000);setInterval(loadPhotos,20000);
 </script></body></html>
 """
 

@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import sys
 
 HOME = os.path.expanduser("~")
@@ -92,9 +93,21 @@ def deno_ok():
     return bool(shutil.which("deno", path=ENV["PATH"]))
 
 
-def update_ytdlp():
+def update_ytdlp(max_age_h=12):
+    """pip-upgrade yt-dlp, at most every max_age_h hours (slow on a Pi 3)."""
+    stamp = os.path.join(os.path.dirname(YTDLP), ".last_update")
+    try:
+        if time.time() - os.path.getmtime(stamp) < max_age_h * 3600:
+            return True, "skipped (updated recently)"
+    except OSError:
+        pass
     r = subprocess.run([PIP, "install", "-q", "-U", "yt-dlp[default]"], env=ENV,
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if r.returncode == 0:
+        try:
+            open(stamp, "w").close()
+        except OSError:
+            pass
     return r.returncode == 0, r.stderr.strip()[-200:]
 
 
