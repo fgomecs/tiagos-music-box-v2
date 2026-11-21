@@ -1,0 +1,12 @@
+*.mp3
+*.webm
+*.log
+*.bak
+*.bak2
+*.bkup
+*.swp
+.*.swp
+__pycache__/
+v2/settings.json
+v2/.enabled
+v2/*.log
