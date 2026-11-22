@@ -8,6 +8,9 @@ flowchart LR
     HOME --> CAM[📷 Camera<br/>live viewfinder · big shutter]
     HOME --> PH[🖼 Photos<br/>grid · swipe · long-press delete]
     CAM --> PH
+    HOME --> DRAW[🖌 Draw<br/>colours · rainbow · undo · save to Photos]
+    HOME --> GAMES[🎮 Games<br/>Bricks · Fish Maze]
+    DRAW --> PH
     PORTAL[Web portal :8080] -. now playing · add songs · photos · language .- MUSIC
 ```
 
@@ -32,7 +35,8 @@ Portal → *Add songs & stories* → paste `URL Name` rows → *Check size & spa
 ## Files
 | File | Purpose |
 |---|---|
-| `v2/kidbox.py` | Kids app (music, camera, photos), 800×480 touch |
+| `v2/kidbox.py` | Kids app (music, camera, photos, draw, games menu), 800×480 touch |
+| `v2/games.py` | Draw pad, Bricks (drag paddle, tap to launch), Fish Maze (swipe or tap to steer) |
 | `v2/setup.sh` | One-time setup |
 | `portal.py` | Web portal: now playing + live screen mirror, add songs, photos, language |
 | `add_songs.py` | Song download engine (yt-dlp + deno), library/capacity report |
