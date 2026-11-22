@@ -8,6 +8,8 @@ Screen: 800x480 touch (Waveshare 4.3" DSI). Runs full screen.
   Camera  -> live viewfinder, big shutter button, photos saved to ~/Pictures/kidbox
   Photos  -> grid of his pictures, tap to view, swipe for next/previous,
              long-press (2 s) on a photo to delete (parents)
+  Draw    -> finger painting (colours, rainbow, eraser, undo, save to Photos)
+  Games   -> Brick Breaker and Fish Maze (games.py)
 
 Audio only: video playback is disabled on purpose (settings.json "video_unlocked").
 Talks to portal.py through musicstate.py (now playing, commands, screen mirror).
@@ -56,11 +58,15 @@ WORDS = {
     "en": {"music": "Music", "camera": "Camera", "photos": "Photos",
            "nothing": "Tap a song!", "no_photos": "No photos yet. Take one!",
            "delete": "Delete this photo?", "no_camera": "Camera not found",
-           "saving": "Saving...", "songs": "songs"},
+           "saving": "Saving...", "songs": "songs", "draw": "Draw", "games": "Games",
+           "bricks": "Bricks", "maze": "Fish Maze", "game_over": "Game over", "great": "Great job!",
+           "level": "Level", "tap_start": "Tap to start!", "ready": "Ready?"},
     "es": {"music": "Música", "camera": "Cámara", "photos": "Fotos",
            "nothing": "¡Toca una canción!", "no_photos": "¡Todavía no hay fotos!",
            "delete": "¿Borrar esta foto?", "no_camera": "No hay cámara",
-           "saving": "Guardando...", "songs": "canciones"},
+           "saving": "Guardando...", "songs": "canciones", "draw": "Dibujar", "games": "Juegos",
+           "bricks": "Ladrillos", "maze": "Pez Laberinto", "game_over": "Fin del juego", "great": "¡Muy bien!",
+           "level": "Nivel", "tap_start": "¡Toca para empezar!", "ready": "¿Listo?"},
 }
 
 DEFAULT_SETTINGS = {"lang": "en", "video_unlocked": False, "volume": 90, "mpv_args": []}
@@ -352,6 +358,28 @@ def icon_trash(surf, c, s, color):
 
 
 # ---------------------------------------------------------------- animated background
+def icon_brush(surf, c, s, color):
+    x, y = c
+    pygame.draw.line(surf, color, (x + s * 0.32, y - s * 0.38), (x - s * 0.08, y + s * 0.08), max(4, s // 7))
+    pygame.draw.circle(surf, color, (int(x - s * 0.16), int(y + s * 0.18)), s // 6)
+    pygame.draw.polygon(surf, color, [(x - s * 0.3, y + s * 0.22), (x - s * 0.42, y + s * 0.42), (x - s * 0.12, y + s * 0.34)])
+    for k, col in enumerate([(255, 92, 168), (255, 214, 64), (64, 210, 230)]):
+        pygame.draw.circle(surf, col, (int(x + s * (0.05 + k * 0.17)), int(y + s * 0.38)), s // 12)
+
+
+def icon_gamepad(surf, c, s, color):
+    x, y = c
+    body = pygame.Rect(0, 0, int(s * 0.95), int(s * 0.55))
+    body.center = (x, y)
+    pygame.draw.rect(surf, color, body, border_radius=int(s * 0.25))
+    k = s // 14
+    cx, cy = int(x - s * 0.24), y
+    pygame.draw.rect(surf, INK, (cx - 3 * k, cy - k, 6 * k, 2 * k))
+    pygame.draw.rect(surf, INK, (cx - k, cy - 3 * k, 2 * k, 6 * k))
+    pygame.draw.circle(surf, RED, (int(x + s * 0.2), int(y - s * 0.06)), int(k * 1.4))
+    pygame.draw.circle(surf, GREEN, (int(x + s * 0.32), int(y + s * 0.08)), int(k * 1.4))
+
+
 class Bubbles:
     def __init__(self, n=18):
         self.b = [self._new(random.uniform(0, H)) for _ in range(n)]
@@ -391,6 +419,10 @@ class Fish:
 
 
 # ---------------------------------------------------------------- the app
+import games  # noqa: E402  (needs the helpers above)
+games.setup(sys.modules[__name__])
+
+
 class KidBox:
     def __init__(self):
         os.makedirs(THUMB_DIR, exist_ok=True)
@@ -422,6 +454,7 @@ class KidBox:
         self.last_mirror = 0
         self.thumb_cache = {}
         self.photos_dirty = False
+        self.activity = None        # running Draw / game
         self.report(playing=False, index=None, name=None, count=len(self.library), screen="color")
 
     # ---- words
@@ -567,7 +600,13 @@ class KidBox:
         self.camera.snap(path, done)
 
     # ---- navigation
+    def start(self, cls):
+        self.activity = cls(self)
+        self.page = "play"
+
     def go(self, page):
+        if page != "play":
+            self.activity = None
         if self.page == "camera" and page != "camera":
             self.camera.close()
         if page == "camera":
@@ -584,6 +623,18 @@ class KidBox:
             return False
         if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE and os.environ.get("KIDBOX_WINDOW"):
             return False
+        if self.page == "play" and self.activity:
+            home = pygame.Rect(10, 10, 64, 64)
+            if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                self.press = (ev.pos, time.time())
+            elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self.press:
+                started_home = home.collidepoint(self.press[0])
+                self.press = None
+                if started_home and home.collidepoint(ev.pos):
+                    self.go("games" if not isinstance(self.activity, games.DrawPad) else "home")
+                    return True
+            self.activity.handle(ev)
+            return True
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             self.press = (ev.pos, time.time())
             self.dragging = False
@@ -637,17 +688,28 @@ class KidBox:
         s.blit(self.bg, (0, 0))
         self.bubbles.draw(s, dt)
         self.fish.draw(s, dt)
-        items = [("music", PINK, icon_note), ("camera", CYAN, icon_camera), ("photos", YELLOW, icon_photo)]
-        for i, (key, color, icon) in enumerate(items):
-            bob = math.sin(self.t * 2 + i) * 6
-            r = pygame.Rect(40 + i * 250, 70 + bob, 220, 250)
-            self.btn(r, lambda k=key: self.go(k))
-            rbox(s, color, r, 36)
-            icon(s, (r.centerx, r.top + 105), 120, WHITE)
-            text(s, self.w(key), 34, WHITE, center=(r.centerx, r.bottom - 42))
+        top = [("music", PINK, icon_note, lambda: self.go("music")),
+               ("camera", CYAN, icon_camera, lambda: self.go("camera")),
+               ("photos", YELLOW, icon_photo, lambda: self.go("photos"))]
+        bottom = [("draw", GREEN, icon_brush, lambda: self.start(games.DrawPad)),
+                  ("games", ORANGE, icon_gamepad, lambda: self.go("games"))]
+        for i, (key, color, icon, act) in enumerate(top):
+            bob = math.sin(self.t * 2 + i) * 4
+            r = pygame.Rect(40 + i * 250, 22 + bob, 220, 190)
+            self.btn(r, act)
+            rbox(s, color, r, 32)
+            icon(s, (r.centerx, r.top + 80), 96, WHITE)
+            text(s, self.w(key), 30, WHITE, center=(r.centerx, r.bottom - 34))
+        for i, (key, color, icon, act) in enumerate(bottom):
+            bob = math.sin(self.t * 2 + i + 3) * 4
+            r = pygame.Rect(40 + i * 375, 228 + bob, 345, 128)
+            self.btn(r, act)
+            rbox(s, color, r, 32)
+            icon(s, (r.left + 90, r.centery), 92, WHITE)
+            text(s, self.w(key), 34, WHITE, center=(r.left + 230, r.centery))
         if self.player.alive() and self.player.index is not None:
             name = self.library[self.player.index][1] if self.player.index < len(self.library) else ""
-            r = self.btn((150, 360, 500, 56), lambda: self.go("music"))
+            r = self.btn((150, 372, 500, 56), lambda: self.go("music"))
             rbox(s, WHITE, r, 28)
             icon_note(s, (r.left + 36, r.centery), 34, PINK)
             text(s, name, 24, INK, topleft=(r.left + 66, r.top + 13), maxw=r.w - 90)
@@ -778,6 +840,41 @@ class KidBox:
         pages = max(1, math.ceil(len(self.photos) / 8))
         for p in range(pages):
             pygame.draw.circle(s, WHITE if p == self.grid_page else (120, 110, 160), (W // 2 - (pages - 1) * 12 + p * 24, 455), 7)
+
+    def draw_games(self, dt):
+        s = self.screen
+        s.blit(self.bg, (0, 0))
+        self.bubbles.draw(s, dt)
+        self.home_button()
+        colors = {"bricks": PINK, "maze": BLUE}
+        for i, (key, cls) in enumerate(games.GAMES):
+            bob = math.sin(self.t * 2 + i) * 5
+            r = pygame.Rect(70 + i * 345, 100 + bob, 315, 300)
+            self.btn(r, lambda c=cls: self.start(c))
+            rbox(s, colors.get(key, CYAN), r, 34)
+            prev = pygame.Rect(r.left + 25, r.top + 25, r.w - 50, 180)
+            pygame.draw.rect(s, (14, 30, 70), prev, border_radius=20)
+            if key == "bricks":
+                for row in range(3):
+                    for col in range(5):
+                        pygame.draw.rect(s, [PINK, ORANGE, YELLOW][row], (prev.left + 18 + col * 46, prev.top + 18 + row * 24, 40, 18), border_radius=5)
+                pygame.draw.circle(s, WHITE, (prev.centerx + 20, prev.top + 125), 9)
+                pygame.draw.rect(s, CYAN, (prev.centerx - 50, prev.bottom - 30, 100, 14), border_radius=7)
+            else:
+                for k in range(7):
+                    pygame.draw.circle(s, WHITE, (prev.left + 40 + k * 30, prev.centery), 4)
+                pygame.draw.circle(s, (255, 120, 200), (prev.right - 30, prev.centery), 9)
+                fx = prev.left + 30 + (self.t * 40) % 150
+                pygame.draw.ellipse(s, (255, 170, 40), (fx - 22, prev.centery - 16, 44, 32))
+                pygame.draw.polygon(s, (255, 120, 40), [(fx - 18, prev.centery), (fx - 36, prev.centery - 14), (fx - 36, prev.centery + 14)])
+                pygame.draw.circle(s, INK, (int(fx + 10), prev.centery - 4), 4)
+                pygame.draw.ellipse(s, (255, 90, 70), (prev.left + 30, prev.top + 25, 40, 28))
+            text(s, self.w(key), 34, WHITE, center=(r.centerx, r.bottom - 48))
+
+    def draw_play(self, dt):
+        self.activity.update(dt)
+        self.activity.draw(self.screen)
+        self.home_button()
 
     def draw_viewer(self, dt):
         s = self.screen
