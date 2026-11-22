@@ -6,6 +6,28 @@ Pi 3 + Waveshare 4.3" DSI capacitive touch (800×480) + PiSugar S Plus 5000 mAh 
 
 _Details: see [Wiring](#wiring)._
 
+## Screenshots
+
+_Rendered from the real code (`v2/kidbox.py`, `v2/games.py`, `portal.py`) at the panel's 800×480. The camera/photo images are drawn samples, not real photos. Scripts: `docs/src/kidbox_shots.py`, `docs/src/shoot.py`._
+
+### Touch screen
+
+| Home | Music (playing) | Home + now playing |
+|---|---|---|
+| <img src="docs/screenshots/v2-1-home.png" width="260"> | <img src="docs/screenshots/v2-2-music.png" width="260"> | <img src="docs/screenshots/v2-3-home-playing.png" width="260"> |
+| **Camera** | **Photos** | **Photo viewer** |
+| <img src="docs/screenshots/v2-4-camera.png" width="260"> | <img src="docs/screenshots/v2-5-photos.png" width="260"> | <img src="docs/screenshots/v2-6-viewer.png" width="260"> |
+| **Draw** | **Games** | **Bricks** |
+| <img src="docs/screenshots/v2-7-draw.png" width="260"> | <img src="docs/screenshots/v2-8-games.png" width="260"> | <img src="docs/screenshots/v2-9-bricks.png" width="260"> |
+| **Fish Maze** | | |
+| <img src="docs/screenshots/v2-10-maze.png" width="260"> | | |
+
+### Web portal (http://&lt;pi-ip&gt;:8080)
+
+| Desktop | Phone |
+|---|---|
+| <img src="docs/screenshots/portal-desktop.png" width="560"> | <img src="docs/screenshots/portal-phone.png" width="200"> |
+
 ```mermaid
 flowchart LR
     HOME[Home] --> MUSIC[🎵 Music<br/>playlist · ⏮ ⏯ ⏭ · animations]
