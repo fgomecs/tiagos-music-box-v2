@@ -2,6 +2,10 @@
 
 Pi 3 + Waveshare 4.3" DSI capacitive touch (800×480) + PiSugar S Plus 5000 mAh + Pi camera. Touch only. V1 (button + OLED) lives in [music-button-pi](https://github.com/fgomecs/music-button-pi) and is separate.
 
+![V2 wiring diagram](docs/wiring-v2.png)
+
+_Details: see [Wiring](#wiring)._
+
 ```mermaid
 flowchart LR
     HOME[Home] --> MUSIC[🎵 Music<br/>playlist · ⏮ ⏯ ⏭ · animations]
@@ -15,8 +19,6 @@ flowchart LR
 ```
 
 ## Wiring
-
-![V2 wiring diagram](docs/wiring-v2.png)
 
 _Diagram source: `docs/src/gen_v2.py` (regenerate: `cd docs/src && python3 gen_v2.py ../wiring-v2.svg && rsvg-convert -w 1500 ../wiring-v2.svg -o ../wiring-v2.png`)._
 
