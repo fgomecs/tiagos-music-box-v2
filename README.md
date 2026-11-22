@@ -14,6 +14,12 @@ flowchart LR
     PORTAL[Web portal :8080] -. now playing · add songs · photos · language .- MUSIC
 ```
 
+## Wiring
+
+![V2 wiring diagram](docs/wiring-v2.png)
+
+_Diagram source: `docs/src/gen_v2.py` (regenerate: `cd docs/src && python3 gen_v2.py ../wiring-v2.svg && rsvg-convert -w 1500 ../wiring-v2.svg -o ../wiring-v2.png`)._
+
 ## Hardware stack (back to front)
 ```
  [ Pi 3 ]          ← DSI ribbon + 2 power wires to the screen, camera ribbon on CSI

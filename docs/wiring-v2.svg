@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1060" viewBox="0 0 1500 1060">
+<rect x="0" y="0" width="1500" height="1060" fill="#f7f5ef"/>
+<text x="30" y="44" font-family="DejaVu Sans, Arial, sans-serif" font-size="26" fill="#111" text-anchor="start" font-weight="bold">Tiago's Music Box V2 · wiring</text>
+<text x="30" y="70" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" fill="#555" text-anchor="start" font-weight="normal">Raspberry Pi 3 · Waveshare 4.3" DSI capacitive touch (800×480) · PiSugar S Plus 5000 mAh · Pi Camera v1.3 · touch only</text>
+<rect x="470" y="210" width="520" height="340" rx="14" fill="#1e7a3c" stroke="#0d4d22" stroke-width="3" />
+<text x="730.0" y="385" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">Raspberry Pi 3</text>
+<text x="730.0" y="408" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#bfe3c9" text-anchor="middle" font-weight="normal">(top view)</text>
+<rect x="660" y="310" width="90" height="60" rx="4" fill="#bbb" stroke="#666" stroke-width="2" />
+<rect x="503" y="221" width="14" height="14" rx="2" fill="#d62828" stroke="#000" stroke-width="1" />
+<rect x="503" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="524" y="221" width="14" height="14" rx="2" fill="#d62828" stroke="#000" stroke-width="1" />
+<rect x="524" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="545" y="221" width="14" height="14" rx="2" fill="#111" stroke="#000" stroke-width="1" />
+<rect x="545" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="566" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="566" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="587" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="587" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="608" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="608" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="629" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="629" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="650" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="650" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="671" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="671" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="692" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="692" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="713" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="713" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="734" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="734" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="755" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="755" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="776" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="776" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="797" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="797" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="818" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="818" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="839" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="839" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="860" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="860" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="881" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="881" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="902" y="221" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<rect x="902" y="241" width="14" height="14" rx="2" fill="#9a9a9a" stroke="#000" stroke-width="1" />
+<text x="510" y="276" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="middle" font-weight="normal">pin 1</text>
+<rect x="980" y="240" width="50" height="70" rx="3" fill="#ccc" stroke="#666" stroke-width="2" />
+<rect x="980" y="330" width="50" height="70" rx="3" fill="#ccc" stroke="#666" stroke-width="2" />
+<rect x="980" y="430" width="55" height="80" rx="3" fill="#ccc" stroke="#666" stroke-width="2" />
+<text x="1040" y="280" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#333" text-anchor="start" font-weight="normal">USB</text>
+<text x="1040" y="370" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#333" text-anchor="start" font-weight="normal">USB</text>
+<text x="1042" y="475" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#333" text-anchor="start" font-weight="normal">Ethernet</text>
+<rect x="500" y="530" width="40" height="30" rx="3" fill="#ccc" stroke="#666" stroke-width="2" />
+<text x="520" y="576" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#333" text-anchor="middle" font-weight="normal">micro-USB</text>
+<text x="520" y="589" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#d62828" text-anchor="middle" font-weight="normal">(do NOT use)</text>
+<rect x="600" y="530" width="70" height="30" rx="3" fill="#ccc" stroke="#666" stroke-width="2" />
+<text x="635" y="576" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#333" text-anchor="middle" font-weight="normal">HDMI</text>
+<rect x="850" y="526" width="36" height="34" rx="17" fill="#222" stroke="#000" stroke-width="2" />
+<text x="868" y="576" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#333" text-anchor="middle" font-weight="normal">3.5 mm audio</text>
+<text x="868" y="589" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#333" text-anchor="middle" font-weight="normal">→ speaker</text>
+<rect x="482" y="330" width="16" height="110" rx="2" fill="#f4f4f4" stroke="#555" stroke-width="2" />
+<text x="510" y="390" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#fff" text-anchor="start" font-weight="normal">DSI</text>
+<rect x="740" y="510" width="90" height="14" rx="2" fill="#f4f4f4" stroke="#555" stroke-width="2" />
+<text x="785" y="502" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#fff" text-anchor="middle" font-weight="normal">CSI (camera)</text>
+<rect x="40" y="230" width="330" height="220" rx="10" fill="#111" stroke="#000" stroke-width="3" />
+<rect x="56" y="246" width="298" height="178" rx="4" fill="#24476e" stroke="#335" stroke-width="2" />
+<text x="205" y="325" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" fill="#cfe8ff" text-anchor="middle" font-weight="bold">Waveshare 4.3" DSI</text>
+<text x="205" y="347" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#cfe8ff" text-anchor="middle" font-weight="normal">800×480 · capacitive touch</text>
+<text x="205" y="367" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#9ec3e6" text-anchor="middle" font-weight="normal">(touch data goes over the ribbon)</text>
+<rect x="363" y="253" width="14" height="14" rx="2" fill="#d4af37" stroke="#333" stroke-width="1.5" />
+<rect x="363" y="278" width="14" height="14" rx="2" fill="#d4af37" stroke="#333" stroke-width="1.5" />
+<text x="356" y="264" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="end" font-weight="normal">5V</text>
+<text x="356" y="289" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="end" font-weight="normal">GND</text>
+<text x="415" y="385" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#333" text-anchor="middle" font-weight="normal">DSI ribbon (15-pin)</text>
+<rect x="730" y="660" width="110" height="100" rx="6" fill="#1e7a3c" stroke="#0d4d22" stroke-width="2" />
+<circle cx="785" cy="710" r="22" fill="#222" stroke="#000" stroke-width="2"/>
+<circle cx="785" cy="710" r="9" fill="#3a5f8f" stroke="#000" stroke-width="1"/>
+<text x="855" y="710" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#222" text-anchor="start" font-weight="bold">Pi Camera v1.3</text>
+<text x="855" y="728" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#555" text-anchor="start" font-weight="normal">on the back, facing out</text>
+<text x="810" y="620" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#333" text-anchor="start" font-weight="normal">CSI ribbon</text>
+<rect x="1115" y="210" width="330" height="230" rx="12" fill="#2b2b2b" stroke="#000" stroke-width="3" />
+<rect x="1135" y="280" width="290" height="130" rx="8" fill="#3a3a3a" stroke="#555" stroke-width="2" />
+<text x="1280" y="335" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="bold">PiSugar S Plus</text>
+<text x="1280" y="357" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#ccc" text-anchor="middle" font-weight="normal">5000 mAh LiPo (mounted UNDER the Pi)</text>
+<rect x="1140" y="228" width="60" height="30" rx="6" fill="#ccc" stroke="#666" stroke-width="2" />
+<text x="1170" y="272" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="middle" font-weight="normal">USB-C</text>
+<text x="1215" y="242" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#7CFC9A" text-anchor="start" font-weight="bold">← charge HERE</text>
+<text x="1215" y="258" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#ccc" text-anchor="start" font-weight="normal">(never the Pi's micro-USB)</text>
+<circle cx="1405" cy="244" r="12" fill="#e63946" stroke="#000" stroke-width="2"/>
+<text x="1385" y="248" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="end" font-weight="normal">power</text>
+<rect x="1106" y="364" width="18" height="12" rx="3" fill="#d4af37" stroke="#000" stroke-width="1" />
+<text x="1131" y="374" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="start" font-weight="normal">pogo 5V</text>
+<polyline points="510,220 510,110 1075,110 1075,370 1106,370" fill="none" stroke="#d62828" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="1106" y="388" width="18" height="12" rx="3" fill="#d4af37" stroke="#000" stroke-width="1" />
+<text x="1131" y="398" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="start" font-weight="normal">pogo 5V</text>
+<polyline points="531,220 531,98 1061,98 1061,394 1106,394" fill="none" stroke="#d62828" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="1106" y="412" width="18" height="12" rx="3" fill="#d4af37" stroke="#000" stroke-width="1" />
+<text x="1131" y="422" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" fill="#fff" text-anchor="start" font-weight="normal">pogo GND</text>
+<polyline points="552,220 552,86 1047,86 1047,418 1106,418" fill="none" stroke="#111" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="1280" y="470" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#333" text-anchor="middle" font-weight="normal">pogo pins press on the underside of header pins 2 · 4 · 6 (no wires)</text>
+<text x="60" y="615" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" fill="#222" text-anchor="start" font-weight="bold">Stack (side view, back → front)</text>
+<rect x="60" y="635" width="330" height="26" rx="4" fill="#1e7a3c" stroke="#000" stroke-width="1.5" />
+<text x="405" y="652.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#333" text-anchor="start" font-weight="normal">Raspberry Pi 3  ← DSI + CSI ribbons, 2 power wires</text>
+<rect x="60" y="669" width="330" height="30" rx="4" fill="#2b2b2b" stroke="#000" stroke-width="1.5" />
+<text x="405" y="688.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#333" text-anchor="start" font-weight="normal">PiSugar S Plus  ← pogo pins under the Pi</text>
+<rect x="80" y="707" width="8" height="46" rx="1" fill="#c9a227" stroke="#7a5a1e" stroke-width="1" />
+<rect x="175" y="707" width="8" height="46" rx="1" fill="#c9a227" stroke="#7a5a1e" stroke-width="1" />
+<rect x="270" y="707" width="8" height="46" rx="1" fill="#c9a227" stroke="#7a5a1e" stroke-width="1" />
+<rect x="365" y="707" width="8" height="46" rx="1" fill="#c9a227" stroke="#7a5a1e" stroke-width="1" />
+<text x="405" y="734.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#333" text-anchor="start" font-weight="normal">M2.5 standoffs ~20 mm</text>
+<rect x="60" y="761" width="330" height="22" rx="4" fill="#111" stroke="#000" stroke-width="1.5" />
+<text x="405" y="776.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#333" text-anchor="start" font-weight="normal">4.3" screen  ← faces Tiago; camera faces out the back</text>
+<rect x="60" y="870" width="920" height="134" rx="6" fill="#fffbe6" stroke="#c9b458" stroke-width="1.5" />
+<text x="72" y="892" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" fill="#5a4a00" text-anchor="start" font-weight="bold">Notes</text>
+<text x="72" y="916" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#333" text-anchor="start" font-weight="normal">• Display overlay (setup.sh): dtoverlay=vc4-kms-dsi-waveshare-panel,4_3_inch in /boot/firmware/config.txt</text>
+<text x="72" y="936" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#333" text-anchor="start" font-weight="normal">• Camera: picamera2, opened only on the Camera screen to save battery. Photos → ~/Pictures/kidbox</text>
+<text x="72" y="956" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#333" text-anchor="start" font-weight="normal">• The screen gets power from the header (5V pin 2, GND pin 6); video + touch go over the DSI ribbon.</text>
+<text x="72" y="976" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#333" text-anchor="start" font-weight="normal">• No GPIO buttons in V2: everything is touch. Free GPIO pins are left for future add-ons.</text>
+<text x="72" y="996" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#333" text-anchor="start" font-weight="normal">• Ribbons: blue/contact side matters. DSI and CSI latches must be fully closed or nothing shows.</text>
+<polyline points="370,380 460,380 460,385 490,385" fill="none" stroke="#00000055" stroke-width="24.5" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="370,380 460,380 460,385 490,385" fill="none" stroke="#e9e9e9" stroke-width="22" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="370,260 410,260 410,140 510,140 510,228" fill="none" stroke="#00000055" stroke-width="6.5" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="370,260 410,260 410,140 510,140 510,228" fill="none" stroke="#d62828" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="370" cy="260" r="3.2" fill="#d62828" stroke="#000" stroke-width="1"/>
+<circle cx="510" cy="228" r="3.2" fill="#d62828" stroke="#000" stroke-width="1"/>
+<rect x="429.0" y="129" width="82.0" height="20" rx="4" fill="#ffffffee" stroke="#d62828" stroke-width="1.5"/>
+<text x="470" y="144" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#222" text-anchor="middle">5V → pin 2</text>
+<polyline points="370,285 440,285 440,165 552,165 552,228" fill="none" stroke="#00000055" stroke-width="6.5" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="370,285 440,285 440,165 552,165 552,228" fill="none" stroke="#222222" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="370" cy="285" r="3.2" fill="#222222" stroke="#000" stroke-width="1"/>
+<circle cx="552" cy="228" r="3.2" fill="#222222" stroke="#000" stroke-width="1"/>
+<rect x="445.4" y="154" width="89.2" height="20" rx="4" fill="#ffffffee" stroke="#222222" stroke-width="1.5"/>
+<text x="490" y="169" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#222" text-anchor="middle">GND → pin 6</text>
+<polyline points="785,524 785,660" fill="none" stroke="#00000055" stroke-width="18.5" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="785,524 785,660" fill="none" stroke="#f0dfa8" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
