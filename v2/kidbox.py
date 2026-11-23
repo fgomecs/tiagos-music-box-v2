@@ -69,7 +69,10 @@ WORDS = {
            "level": "Nivel", "tap_start": "¡Toca para empezar!", "ready": "¿Listo?"},
 }
 
-DEFAULT_SETTINGS = {"lang": "en", "video_unlocked": False, "volume": 90, "mpv_args": []}
+# alsa_device: play straight to the sound card (like V1) instead of through the desktop's
+# PipeWire layer, which sounds bad on the Pi 3 headphone jack. "" = use the system default.
+DEFAULT_SETTINGS = {"lang": "en", "video_unlocked": False, "volume": 100, "mpv_args": [],
+                    "alsa_device": "plughw:CARD=Headphones,DEV=0"}
 
 
 def load_settings():
@@ -106,14 +109,17 @@ class Player:
         self.settings = settings
         self._last_poll = 0
 
-    def play(self, index, path):
+    def play(self, index, path, start=0):
         self.stop()
         try:
             os.remove(MPV_SOCK)
         except FileNotFoundError:
             pass
+        dev = self.settings.get("alsa_device")
+        out = ["--ao=alsa", f"--audio-device=alsa/{dev}"] if dev else []
         args = ["mpv", "--no-video", "--no-terminal", "--idle=no",
-                f"--volume={self.settings.get('volume', 90)}",
+                f"--volume={self.settings.get('volume', 100)}", *out,
+                *([f"--start={start:.1f}"] if start else []),
                 f"--input-ipc-server={MPV_SOCK}", *self.settings.get("mpv_args", []), path]
         try:
             self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -426,7 +432,12 @@ games.setup(sys.modules[__name__])
 class KidBox:
     def __init__(self):
         os.makedirs(THUMB_DIR, exist_ok=True)
+        dev = load_settings().get("alsa_device")
+        if dev:                                    # game sounds go to the same card, opened only during games
+            os.environ.setdefault("SDL_AUDIODRIVER", "alsa")
+            os.environ.setdefault("AUDIODEV", dev)
         pygame.init()
+        pygame.mixer.quit()                        # don't hold the sound card; mpv needs it
         # SCALED: always draw on an 800x480 canvas and let SDL stretch it to whatever
         # the display really is (the 4.3" panel is 800x480; a headless/HDMI desktop is bigger)
         flags = pygame.SCALED if os.environ.get("KIDBOX_WINDOW") else (pygame.FULLSCREEN | pygame.SCALED)
@@ -455,8 +466,8 @@ class KidBox:
         self.thumb_cache = {}
         self.photos_dirty = False
         self.activity = None        # running Draw / game
-        games.music_playing = self.music_on          # game sounds stay quiet while music plays
-        threading.Thread(target=games.sfx, args=("",), daemon=True).start()   # build game sounds in the background
+        self.resume = None          # (song index, seconds) paused by camera / games
+        threading.Thread(target=games.build_sounds, daemon=True).start()   # make game beeps in the background   # build game sounds in the background
         self.report(playing=False, index=None, name=None, count=len(self.library), screen="color")
 
     # ---- words
@@ -512,12 +523,13 @@ class KidBox:
             self.report(count=len(self.library))
 
     # ---- music
-    def play(self, i):
+    def play(self, i, start=0):
         if not self.library:
             return
+        self.resume = None
         i %= len(self.library)
         path, name = self.library[i]
-        self.player.play(i, path)
+        self.player.play(i, path, start)
         self.report(playing=True, index=i, name=name, started=time.time(), count=len(self.library))
 
     def next_song(self):
@@ -537,6 +549,8 @@ class KidBox:
         if self.player.alive():
             self.player.toggle()
             self.report(playing=not self.player.paused)
+        elif self.resume:
+            self.play(*self.resume)                 # pick up where camera / game paused it
         else:
             self.play(self.player.index or 0)
 
@@ -609,9 +623,12 @@ class KidBox:
         return self.player.alive() and not self.player.paused
 
     def pause_music(self):
-        """One thing at a time: camera and games pause the music (Pi 3 can't do it all)."""
-        if self.music_on():
-            self.player.toggle()
+        """One thing at a time: camera and games pause the music (Pi 3 can't do it all).
+        mpv is closed so the sound card is free for game beeps; Play resumes at the same spot."""
+        if self.player.alive():
+            idx, pos = self.player.index, self.player.pos
+            self.player.stop()
+            self.resume = (idx, pos) if idx is not None else None
             self.report(playing=False)
 
     def busy(self):
@@ -621,12 +638,14 @@ class KidBox:
     def start(self, cls):
         if cls is not games.DrawPad:
             self.pause_music()
+            games.audio_on()
         self.activity = cls(self)
         self.page = "play"
 
     def go(self, page):
         if page != "play":
             self.activity = None
+            games.audio_off()
         if self.page == "camera" and page != "camera":
             self.camera.close()
         if page == "camera":

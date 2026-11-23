@@ -23,14 +23,15 @@ def setup(kidbox_module):
 
 
 # ------------------------------------------------------------ sound effects
-# Little beeps made in code (no sound files). If audio isn't available the games stay silent.
+# Little beeps made in code (no sound files). The sound card is opened only while a game
+# runs (music is stopped then), and released on the way out so mpv can use it again.
+_RAW = {}
 _SFX = {}
 _SR = 22050
-music_playing = lambda: False      # kidbox replaces this; no beeps over the music
 
 
 def _tone(notes, vol=0.35, wave="square"):
-    """notes = [(freq_start, freq_end, ms), ...] -> pygame Sound."""
+    """notes = [(freq_start, freq_end, ms), ...] -> raw 16-bit mono samples."""
     import array
     buf = array.array("h")
     phase = 0.0
@@ -47,33 +48,50 @@ def _tone(notes, vol=0.35, wave="square"):
             else:
                 v = math.sin(phase * 2 * math.pi) * env
             buf.append(int(v * vol * 32767))
-    return pygame.mixer.Sound(buffer=buf.tobytes())
+    return buf.tobytes()
+
+
+def build_sounds():
+    if _RAW:
+        return
+    _RAW.update({
+        "paddle": _tone([(330, 330, 50)]),
+        "wall": _tone([(220, 220, 30)], 0.2),
+        "brick": _tone([(660, 990, 70)]),
+        "lose": _tone([(440, 330, 150), (330, 220, 150), (220, 110, 300)], wave="sine"),
+        "win": _tone([(523, 523, 110), (659, 659, 110), (784, 784, 110), (1047, 1047, 260)], wave="sine"),
+        "launch": _tone([(300, 700, 120)], 0.25),
+        "pearl": _tone([(800, 600, 45)], 0.2),
+        "pearl2": _tone([(600, 800, 45)], 0.2),
+        "power": _tone([(300, 1200, 300)], 0.3, "sine"),
+        "eat": _tone([(400, 400, 60), (600, 600, 60), (900, 900, 120)]),
+    })
+
+
+def audio_on():
+    try:
+        build_sounds()
+        if not pygame.mixer.get_init():
+            pygame.mixer.init(_SR, -16, 1, 1024)
+        _SFX.clear()
+        _SFX.update({k: pygame.mixer.Sound(buffer=v) for k, v in _RAW.items()})
+    except Exception as e:
+        print("sfx off:", e)
+        _SFX.clear()
+
+
+def audio_off():
+    _SFX.clear()
+    try:
+        if pygame.mixer.get_init():
+            pygame.mixer.quit()
+    except Exception:
+        pass
 
 
 def sfx(name):
-    if not _SFX:
-        try:
-            if not pygame.mixer.get_init():
-                pygame.mixer.init(_SR, -16, 1, 512)
-            _SFX.update({
-                "paddle": _tone([(330, 330, 50)]),
-                "wall": _tone([(220, 220, 30)], 0.2),
-                "brick": _tone([(660, 990, 70)]),
-                "lose": _tone([(440, 330, 150), (330, 220, 150), (220, 110, 300)], wave="sine"),
-                "win": _tone([(523, 523, 110), (659, 659, 110), (784, 784, 110), (1047, 1047, 260)], wave="sine"),
-                "launch": _tone([(300, 700, 120)], 0.25),
-                "pearl": _tone([(800, 600, 45)], 0.2),
-                "pearl2": _tone([(600, 800, 45)], 0.2),
-                "power": _tone([(300, 1200, 300)], 0.3, "sine"),
-                "eat": _tone([(400, 400, 60), (600, 600, 60), (900, 900, 120)]),
-                "tap": _tone([(1200, 1200, 25)], 0.15, "sine"),
-                "shutter": _tone([(0, 0, 90)], 0.3),
-            })
-        except Exception as e:
-            print("sfx off:", e)
-            _SFX["_off"] = True
     snd = _SFX.get(name)
-    if snd and not music_playing():
+    if snd:
         try:
             snd.play()
         except Exception:
@@ -173,7 +191,6 @@ class DrawPad:
         return b
 
     def press(self, kind, val):
-        sfx("shutter" if kind == "save" else "tap")
         if kind == "color":
             self.color, self.rainbow, self.eraser = val, False, False
         elif kind == "rainbow":
