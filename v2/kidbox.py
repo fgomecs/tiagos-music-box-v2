@@ -98,40 +98,65 @@ def load_library():
 
 # ---------------------------------------------------------------- audio (mpv)
 class Player:
-    """mpv in the background, controlled over its JSON IPC socket. Audio only."""
+    """One long-running mpv (audio only), controlled over its JSON IPC socket.
+    Keeping mpv alive makes Play / Next instant; starting mpv on a Pi 3 takes seconds.
+    stop() closes mpv completely (frees the sound card for games / camera)."""
 
     def __init__(self, settings):
         self.proc = None
         self.index = None
         self.paused = False
+        self.loaded = False
         self.pos = 0.0
         self.dur = 0.0
         self.settings = settings
         self._last_poll = 0
+        self._loaded_at = 0
+        self._lock = threading.Lock()
+
+    def _start(self):
+        with self._lock:
+            if self.proc and self.proc.poll() is None:
+                return True
+            try:
+                os.remove(MPV_SOCK)
+            except FileNotFoundError:
+                pass
+            dev = self.settings.get("alsa_device")
+            out = ["--ao=alsa", f"--audio-device=alsa/{dev}"] if dev else []
+            args = ["mpv", "--idle=yes", "--no-video", "--no-terminal", "--no-config",
+                    "--load-scripts=no", "--ytdl=no", "--audio-display=no",
+                    f"--volume={self.settings.get('volume', 100)}", *out,
+                    f"--input-ipc-server={MPV_SOCK}", *self.settings.get("mpv_args", [])]
+            try:
+                self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except FileNotFoundError:
+                print("mpv not installed")
+                self.proc = None
+                return False
+            for _ in range(100):                      # wait up to 5 s for the control socket
+                if os.path.exists(MPV_SOCK):
+                    break
+                time.sleep(0.05)
+            return True
+
+    def warm(self):
+        """Start mpv in the background so the next Play is instant."""
+        threading.Thread(target=self._start, daemon=True).start()
 
     def play(self, index, path, start=0):
-        self.stop()
-        try:
-            os.remove(MPV_SOCK)
-        except FileNotFoundError:
-            pass
-        dev = self.settings.get("alsa_device")
-        out = ["--ao=alsa", f"--audio-device=alsa/{dev}"] if dev else []
-        args = ["mpv", "--no-video", "--no-terminal", "--idle=no",
-                f"--volume={self.settings.get('volume', 100)}", *out,
-                *([f"--start={start:.1f}"] if start else []),
-                f"--input-ipc-server={MPV_SOCK}", *self.settings.get("mpv_args", []), path]
-        try:
-            self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self.index, self.paused, self.pos, self.dur = index, False, 0.0, 0.0
-        except FileNotFoundError:
-            print("mpv not installed")
-            self.proc = None
+        if not self._start():
+            return
+        self._ipc("set_property", "start", f"{start:.1f}" if start else "0")
+        self._ipc("loadfile", path, "replace")
+        self._ipc("set_property", "pause", False)
+        self.index, self.paused, self.loaded = index, False, True
+        self.pos, self.dur, self._loaded_at = float(start or 0), 0.0, time.time()
 
     def _ipc(self, *cmd):
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(0.15)
+            s.settimeout(0.3)
             s.connect(MPV_SOCK)
             s.sendall((json.dumps({"command": list(cmd)}) + "\n").encode())
             data = b""
@@ -154,7 +179,14 @@ class Player:
             self.paused = not self.paused
             self._ipc("set_property", "pause", self.paused)
 
+    def halt(self):
+        """Stop the song but keep mpv ready."""
+        if self.proc and self.proc.poll() is None:
+            self._ipc("stop")
+        self.loaded = self.paused = False
+
     def stop(self):
+        """Close mpv completely (releases the sound card)."""
         if self.proc:
             self.proc.terminate()
             try:
@@ -162,21 +194,24 @@ class Player:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
         self.proc = None
-        self.paused = False
+        self.loaded = self.paused = False
 
     def alive(self):
-        return self.proc is not None and self.proc.poll() is None
+        return self.loaded and self.proc is not None and self.proc.poll() is None
 
     def poll(self):
         """Refresh position/duration a few times per second. Returns False when the song ended."""
-        if not self.proc:
+        if not self.loaded:
             return True
-        if self.proc.poll() is not None:
-            self.proc = None
+        if not self.proc or self.proc.poll() is not None:
+            self.proc, self.loaded = None, False
             return False
         now = time.time()
         if now - self._last_poll > 0.4:
             self._last_poll = now
+            if now - self._loaded_at > 1.5 and self._ipc("get_property", "idle-active") is True:
+                self.loaded = False                   # song finished, mpv is idle again
+                return False
             p = self._ipc("get_property", "time-pos")
             d = self._ipc("get_property", "duration")
             self.pos = p if isinstance(p, (int, float)) else self.pos
@@ -467,7 +502,8 @@ class KidBox:
         self.photos_dirty = False
         self.activity = None        # running Draw / game
         self.resume = None          # (song index, seconds) paused by camera / games
-        threading.Thread(target=games.build_sounds, daemon=True).start()   # make game beeps in the background   # build game sounds in the background
+        threading.Thread(target=games.build_sounds, daemon=True).start()
+        self.player.warm()                           # mpv ready before the first tap on Play   # make game beeps in the background   # build game sounds in the background
         self.report(playing=False, index=None, name=None, count=len(self.library), screen="color")
 
     # ---- words
@@ -509,7 +545,7 @@ class KidBox:
         if cmd == "next":
             self.next_song()
         elif cmd == "stop":
-            self.player.stop()
+            self.player.halt()
             self.report(playing=False)
         elif cmd.startswith("play "):
             try:
@@ -627,8 +663,9 @@ class KidBox:
         mpv is closed so the sound card is free for game beeps; Play resumes at the same spot."""
         if self.player.alive():
             idx, pos = self.player.index, self.player.pos
-            self.player.stop()
             self.resume = (idx, pos) if idx is not None else None
+        if self.player.proc:
+            self.player.stop()
             self.report(playing=False)
 
     def busy(self):
@@ -644,10 +681,13 @@ class KidBox:
 
     def go(self, page):
         if page != "play":
+            if self.activity is not None and not isinstance(self.activity, games.DrawPad):
+                games.audio_off()
+                self.player.warm()                   # get mpv ready again after a game
             self.activity = None
-            games.audio_off()
         if self.page == "camera" and page != "camera":
             self.camera.close()
+            self.player.warm()
         if page == "camera":
             self.pause_music()
             self.camera.open()
