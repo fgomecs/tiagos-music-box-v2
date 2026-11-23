@@ -59,13 +59,13 @@ WORDS = {
            "nothing": "Tap a song!", "no_photos": "No photos yet. Take one!",
            "delete": "Delete this photo?", "no_camera": "Camera not found",
            "saving": "Saving...", "songs": "songs", "draw": "Draw", "games": "Games",
-           "bricks": "Bricks", "maze": "Fish Maze", "game_over": "Game over", "great": "Great job!",
+           "bricks": "Bricks", "maze": "Fish Maze", "dig": "Mole Dig", "game_over": "Game over", "great": "Great job!",
            "level": "Level", "tap_start": "Tap to start!", "ready": "Ready?"},
     "es": {"music": "Música", "camera": "Cámara", "photos": "Fotos",
            "nothing": "¡Toca una canción!", "no_photos": "¡Todavía no hay fotos!",
            "delete": "¿Borrar esta foto?", "no_camera": "No hay cámara",
            "saving": "Guardando...", "songs": "canciones", "draw": "Dibujar", "games": "Juegos",
-           "bricks": "Ladrillos", "maze": "Pez Laberinto", "game_over": "Fin del juego", "great": "¡Muy bien!",
+           "bricks": "Ladrillos", "maze": "Pez Laberinto", "dig": "Topo Excavador", "game_over": "Fin del juego", "great": "¡Muy bien!",
            "level": "Nivel", "tap_start": "¡Toca para empezar!", "ready": "¿Listo?"},
 }
 
@@ -926,30 +926,49 @@ class KidBox:
         s.blit(self.bg, (0, 0))
         self.bubbles.draw(s, dt)
         self.home_button()
-        colors = {"bricks": PINK, "maze": BLUE}
+        colors = {"bricks": PINK, "maze": BLUE, "dig": ORANGE}
+        n = len(games.GAMES)
+        tw = 220 if n > 2 else 315
+        gap = (W - n * tw) // (n + 1)
         for i, (key, cls) in enumerate(games.GAMES):
             bob = math.sin(self.t * 2 + i) * 5
-            r = pygame.Rect(70 + i * 345, 100 + bob, 315, 300)
+            r = pygame.Rect(gap + i * (tw + gap), 100 + bob, tw, 300)
             self.btn(r, lambda c=cls: self.start(c))
             rbox(s, colors.get(key, CYAN), r, 34)
-            prev = pygame.Rect(r.left + 25, r.top + 25, r.w - 50, 180)
+            prev = pygame.Rect(r.left + 18, r.top + 20, r.w - 36, 180)
             pygame.draw.rect(s, (14, 30, 70), prev, border_radius=20)
+            cx, cy = prev.center
             if key == "bricks":
+                bw = (prev.w - 30) // 5
                 for row in range(3):
                     for col in range(5):
-                        pygame.draw.rect(s, [PINK, ORANGE, YELLOW][row], (prev.left + 18 + col * 46, prev.top + 18 + row * 24, 40, 18), border_radius=5)
-                pygame.draw.circle(s, WHITE, (prev.centerx + 20, prev.top + 125), 9)
-                pygame.draw.rect(s, CYAN, (prev.centerx - 50, prev.bottom - 30, 100, 14), border_radius=7)
+                        pygame.draw.rect(s, [PINK, ORANGE, YELLOW][row], (prev.left + 15 + col * bw, prev.top + 18 + row * 24, bw - 6, 18), border_radius=5)
+                pygame.draw.circle(s, WHITE, (cx + 20, prev.top + 125), 9)
+                pygame.draw.rect(s, CYAN, (cx - 45, prev.bottom - 30, 90, 14), border_radius=7)
+            elif key == "maze":
+                for k in range(6):
+                    pygame.draw.circle(s, WHITE, (prev.left + 30 + k * (prev.w - 60) // 5, cy), 4)
+                pygame.draw.circle(s, (255, 120, 200), (prev.right - 24, cy), 9)
+                fx = prev.left + 30 + (self.t * 40) % (prev.w - 70)
+                pygame.draw.ellipse(s, (255, 170, 40), (fx - 22, cy - 16, 44, 32))
+                pygame.draw.polygon(s, (255, 120, 40), [(fx - 18, cy), (fx - 36, cy - 14), (fx - 36, cy + 14)])
+                pygame.draw.circle(s, INK, (int(fx + 10), cy - 4), 4)
+                pygame.draw.ellipse(s, (255, 90, 70), (prev.left + 24, prev.top + 22, 40, 28))
             else:
-                for k in range(7):
-                    pygame.draw.circle(s, WHITE, (prev.left + 40 + k * 30, prev.centery), 4)
-                pygame.draw.circle(s, (255, 120, 200), (prev.right - 30, prev.centery), 9)
-                fx = prev.left + 30 + (self.t * 40) % 150
-                pygame.draw.ellipse(s, (255, 170, 40), (fx - 22, prev.centery - 16, 44, 32))
-                pygame.draw.polygon(s, (255, 120, 40), [(fx - 18, prev.centery), (fx - 36, prev.centery - 14), (fx - 36, prev.centery + 14)])
-                pygame.draw.circle(s, INK, (int(fx + 10), prev.centery - 4), 4)
-                pygame.draw.ellipse(s, (255, 90, 70), (prev.left + 30, prev.top + 25, 40, 28))
-            text(s, self.w(key), 34, WHITE, center=(r.centerx, r.bottom - 48))
+                pygame.draw.rect(s, (138, 88, 46), prev.inflate(-16, -16), border_radius=14)
+                pygame.draw.rect(s, (30, 18, 12), (prev.left + 20, cy - 12, prev.w - 40, 26), border_radius=10)
+                pygame.draw.rect(s, (30, 18, 12), (cx - 13, prev.top + 20, 26, cy - prev.top - 10), border_radius=10)
+                for gx, gy in ((prev.left + 34, prev.top + 36), (prev.right - 40, prev.bottom - 34)):
+                    pygame.draw.polygon(s, (60, 220, 110), [(gx, gy - 10), (gx + 9, gy), (gx, gy + 11), (gx - 9, gy)])
+                pygame.draw.rect(s, (150, 90, 40), (prev.right - 56, prev.top + 26, 28, 24), border_radius=5)
+                mx = prev.left + 40 + (self.t * 35) % (prev.w - 80)
+                pygame.draw.ellipse(s, (70, 60, 70), (mx - 18, cy - 14, 36, 28))
+                pygame.draw.circle(s, (255, 140, 170), (int(mx + 18), cy), 5)
+            label = self.w(key)
+            size = 34 if n <= 2 else 30
+            while size > 18 and font(size).size(label)[0] > r.w - 20:      # shrink long names (Spanish)
+                size -= 2
+            text(s, label, size, WHITE, center=(r.centerx, r.bottom - 48))
 
     def draw_play(self, dt):
         self.activity.update(dt)

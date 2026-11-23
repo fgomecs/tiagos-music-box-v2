@@ -785,4 +785,427 @@ class FishMaze:
             self.overlay.draw(s, self.score)
 
 
-GAMES = [("bricks", Bricks), ("maze", FishMaze)]
+# ============================================================== MOLE DIG (a digging game)
+class MoleDig:
+    """Dig tunnels, collect gems, drop treasure chests on the beetles, pop them with bubbles.
+    Hold a finger where the mole should go; tap the round button to blow a bubble."""
+    COLS, ROWS, CELL = 15, 10, 40
+
+    def __init__(self, app):
+        self.app = app
+        self.score, self.lives, self.level = 0, 3, 1
+        self.ox = (K.W - self.COLS * self.CELL) // 2
+        self.oy = TOP + (K.H - TOP - self.ROWS * self.CELL) // 2
+        self.fire_btn = pygame.Rect(K.W - 92, K.H - 120, 84, 84)
+        self.overlay = None
+        self.target = None              # finger position while held
+        self.new_level()
+
+    # ---- level
+    def new_level(self):
+        rnd = random.Random(self.level * 7919 + random.randint(0, 9999))
+        C, R = self.COLS, self.ROWS
+        self.dirt = [[True] * C for _ in range(R)]
+        self.spawn = (C - 1, 0)
+        for c in range(C - 6, C):                      # beetle nest tunnel, top right
+            self.dirt[0][c] = False
+        self.start = (C // 2, R - 1)
+        self.dirt[R - 1][C // 2] = False
+        self.gems = set()
+        while len(self.gems) < 18 + 2 * min(self.level, 6):    # gems in little clusters
+            c, r = rnd.randrange(C), rnd.randrange(1, R - 1)
+            for dc, dr in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                p = (c + dc, r + dr)
+                if p[0] < C and p[1] < R - 1 and p != self.start:
+                    self.gems.add(p)
+        self.chests = []                                # dicts: c, r, state, t, fell, y
+        tries = 0
+        while len(self.chests) < 5 + min(self.level, 4) and tries < 500:
+            tries += 1
+            c, r = rnd.randrange(C), rnd.randrange(1, R - 3)
+            if (c, r) in self.gems or any(ch["c"] == c and abs(ch["r"] - r) < 2 for ch in self.chests):
+                continue
+            self.chests.append({"c": c, "r": r, "state": "still", "t": 0.0, "fell": 0, "y": float(r)})
+        self.coins = {}                                 # cell -> time left
+        self.render_dirt()
+        self.reset_round()
+
+    def reset_round(self):
+        self.mole = Mover(*self.start, 4.2)
+        self.facing = (1, 0)
+        self.beetles = []
+        self.spawned = 0
+        self.spawn_t = 2.5
+        self.bubble = None
+        self.cool = 0.0
+        self.ready = 1.5
+        self.dist = {}
+        self.dist_from = None
+
+    def restart(self):
+        self.score, self.lives, self.level = 0, 3, 1
+        self.overlay = None
+        self.new_level()
+
+    def next_level(self):
+        self.level += 1
+        self.overlay = None
+        self.new_level()
+
+    # ---- grid helpers
+    def inside(self, c, r):
+        return 0 <= c < self.COLS and 0 <= r < self.ROWS
+
+    def chest_at(self, c, r, still_only=False):
+        for ch in self.chests:
+            if ch["c"] == c and ch["r"] == r and (not still_only or ch["state"] != "fall"):
+                return ch
+        return None
+
+    def px(self, c, r):
+        return self.ox + c * self.CELL + self.CELL / 2, self.oy + r * self.CELL + self.CELL / 2
+
+    def cell_of(self, pos):
+        return int((pos[0] - self.ox) // self.CELL), int((pos[1] - self.oy) // self.CELL)
+
+    def render_dirt(self):
+        img = pygame.Surface((K.W, K.H))
+        img.fill((30, 18, 12))
+        rnd = random.Random(3)
+        for r in range(self.ROWS):
+            band = [(150, 98, 52), (138, 88, 46), (126, 78, 40), (114, 70, 36)][min(3, r * 4 // self.ROWS)]
+            for c in range(self.COLS):
+                rect = pygame.Rect(self.ox + c * self.CELL, self.oy + r * self.CELL, self.CELL, self.CELL)
+                pygame.draw.rect(img, band, rect)
+                for _ in range(4):
+                    pygame.draw.circle(img, (band[0] - 30, band[1] - 22, band[2] - 14),
+                                       (rect.left + rnd.randrange(4, 36), rect.top + rnd.randrange(4, 36)), rnd.randrange(1, 4))
+        pygame.draw.rect(img, (70, 140, 60), (self.ox, self.oy - 6, self.COLS * self.CELL, 6))      # grass
+        self.dirt_img = img
+        for r in range(self.ROWS):
+            for c in range(self.COLS):
+                if not self.dirt[r][c]:
+                    self.dig(c, r, force=True)
+
+    def dig(self, c, r, force=False):
+        if not self.inside(c, r) or (not self.dirt[r][c] and not force):
+            return
+        self.dirt[r][c] = False
+        rect = pygame.Rect(self.ox + c * self.CELL + 3, self.oy + r * self.CELL + 3, self.CELL - 6, self.CELL - 6)
+        pygame.draw.rect(self.dirt_img, (30, 18, 12), rect, border_radius=10)
+        for dc, dr in DIRS.values():                    # open the wall toward dug neighbours
+            n = (c + dc, r + dr)
+            if self.inside(*n) and not self.dirt[n[1]][n[0]]:
+                pygame.draw.rect(self.dirt_img, (30, 18, 12), rect.move(dc * self.CELL // 2, dr * self.CELL // 2), border_radius=6)
+        self.dist_from = None                           # tunnels changed: recompute beetle paths
+
+    # ---- input
+    def handle(self, ev):
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_SPACE:
+            self.fire()
+        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+            if self.overlay:
+                return
+            if self.fire_btn.collidepoint(ev.pos):
+                self.fire()
+            elif ev.pos[1] > TOP:
+                self.target = ev.pos
+        elif ev.type == pygame.MOUSEMOTION and ev.buttons[0] and self.target:
+            self.target = ev.pos
+        elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
+            if self.overlay:
+                self.overlay.tap(ev.pos)
+            self.target = None
+
+    def want(self):
+        keys = pygame.key.get_pressed()
+        for k, d in ((pygame.K_LEFT, "L"), (pygame.K_RIGHT, "R"), (pygame.K_UP, "U"), (pygame.K_DOWN, "D")):
+            if keys[k]:
+                return [DIRS[d]]
+        if not self.target:
+            return []
+        tc, tr = self.cell_of(self.target)
+        dc, dr = tc - self.mole.col, tr - self.mole.row
+        if dc == 0 and dr == 0:
+            return []
+        h = [(1 if dc > 0 else -1, 0)] if dc else []
+        v = [(0, 1 if dr > 0 else -1)] if dr else []
+        return h + v if abs(dc) >= abs(dr) else v + h
+
+    def can_enter(self, d):
+        c, r = self.mole.col + d[0], self.mole.row + d[1]
+        if not self.inside(c, r):
+            return False
+        ch = self.chest_at(c, r)
+        if not ch:
+            return True
+        if d[1] != 0 or ch["state"] == "fall":
+            return False
+        b = (c + d[0], r)                               # push the chest sideways
+        if not self.inside(*b) or self.chest_at(*b) or any((bt.col, bt.row) == b for bt in self.beetles):
+            return False
+        ch["c"], ch["state"], ch["t"] = b[0], "still", 0.0
+        self.dig(*b)
+        return True
+
+    def fire(self):
+        if self.cool > 0 or self.bubble or self.overlay or self.ready > 0:
+            return
+        x, y = self.mole.pos(self.CELL, self.ox, self.oy)
+        self.bubble = [x, y, self.facing]
+        self.cool = 2.5
+        sfx("launch")
+
+    # ---- update
+    def move_mole(self, dt):
+        m = self.mole
+        wants = self.want()
+        if m.dir != (0, 0) and wants and wants[0] == (-m.dir[0], -m.dir[1]):     # turn around mid-cell
+            m.col, m.row = m.col + m.dir[0], m.row + m.dir[1]
+            m.dir, m.t = wants[0], 1 - m.t
+            self.facing = m.dir
+        if m.dir == (0, 0):
+            for d in wants:
+                if self.can_enter(d):
+                    m.dir, m.t = d, 0.0
+                    self.facing = d
+                    self.dig(m.col + d[0], m.row + d[1])
+                    break
+            else:
+                return
+        m.t += m.speed * dt
+        if m.t >= 1:
+            m.col += m.dir[0]
+            m.row += m.dir[1]
+            m.dir, m.t = (0, 0), 0.0
+            p = (m.col, m.row)
+            if p in self.gems:
+                self.gems.discard(p)
+                self.score += 25
+                sfx("pearl")
+            if p in self.coins:
+                del self.coins[p]
+                self.score += 100
+                sfx("power")
+
+    def update_chests(self, dt):
+        for ch in list(self.chests):
+            c, r = ch["c"], ch["r"]
+            below = (c, r + 1)
+            mole_cells = {(self.mole.col, self.mole.row), (self.mole.col + self.mole.dir[0], self.mole.row + self.mole.dir[1])}
+            free = (self.inside(*below) and not self.dirt[below[1]][below[0]]
+                    and not self.chest_at(*below) and below not in mole_cells)
+            if ch["state"] == "still":
+                if free:
+                    ch["state"], ch["t"] = "wobble", 0.6
+                    sfx("wall")
+            elif ch["state"] == "wobble":
+                ch["t"] -= dt
+                if not free:
+                    ch["state"] = "still"
+                elif ch["t"] <= 0:
+                    ch["state"], ch["fell"], ch["y"] = "fall", 0, float(r)
+            elif ch["state"] == "fall":
+                ch["y"] += 7 * dt
+                while ch["y"] >= ch["r"] + 1:
+                    if free:
+                        ch["r"] += 1
+                        ch["fell"] += 1
+                        for bt in list(self.beetles):           # squash beetles underneath
+                            if (bt.col, bt.row) == (ch["c"], ch["r"]) or (bt.col + bt.dir[0], bt.row + bt.dir[1]) == (ch["c"], ch["r"]):
+                                self.beetles.remove(bt)
+                                self.score += 250
+                                sfx("eat")
+                        below = (ch["c"], ch["r"] + 1)
+                        mole_cells = {(self.mole.col, self.mole.row)}
+                        free = (self.inside(*below) and not self.dirt[below[1]][below[0]]
+                                and not self.chest_at(*below) and below not in mole_cells)
+                    else:
+                        ch["y"] = float(ch["r"])
+                        if ch["fell"] >= 2:                   # big drop: it cracks open
+                            self.chests.remove(ch)
+                            self.coins[(ch["c"], ch["r"])] = 10.0
+                            sfx("brick")
+                        else:
+                            ch["state"] = "still"
+                        break
+
+    def beetle_paths(self):
+        src = (self.mole.col, self.mole.row)
+        if self.dist_from == src:
+            return
+        self.dist_from = src
+        self.dist = {src: 0}
+        todo = [src]
+        while todo:
+            nxt = []
+            for c, r in todo:
+                for dc, dr in DIRS.values():
+                    n = (c + dc, r + dr)
+                    if self.inside(*n) and not self.dirt[n[1]][n[0]] and n not in self.dist:
+                        self.dist[n] = self.dist[(c, r)] + 1
+                        nxt.append(n)
+            todo = nxt
+
+    def move_beetles(self, dt):
+        self.spawn_t -= dt
+        alive_max = 2 + self.level // 2
+        if self.spawn_t <= 0 and len(self.beetles) < alive_max and self.spawned < 4 + self.level:
+            if not self.chest_at(*self.spawn):
+                self.beetles.append(Mover(*self.spawn, min(3.4, 2.0 + 0.2 * self.level)))
+                self.spawned += 1
+            self.spawn_t = 4.0
+        self.beetle_paths()
+        for b in self.beetles:
+            digging = getattr(b, "digging", False)
+            b.t += b.speed * dt * (0.45 if digging else 1) if b.dir != (0, 0) else 0
+            if b.dir != (0, 0) and b.t < 1:
+                continue
+            if b.dir != (0, 0):
+                b.col, b.row = b.col + b.dir[0], b.row + b.dir[1]
+                self.dig(b.col, b.row)
+            b.t = 0.0
+            b.digging = False
+            opts = []
+            if (b.col, b.row) in self.dist:                 # a tunnel leads to the mole: follow it
+                for d in DIRS.values():
+                    n = (b.col + d[0], b.row + d[1])
+                    if self.inside(*n) and not self.dirt[n[1]][n[0]] and not self.chest_at(*n):
+                        opts.append((self.dist.get(n, 999) + random.random() * 1.5, d))
+            else:                                           # no tunnel yet: slowly dig toward the mole
+                for d in DIRS.values():
+                    n = (b.col + d[0], b.row + d[1])
+                    if self.inside(*n) and not self.chest_at(*n):
+                        far = abs(n[0] - self.mole.col) + abs(n[1] - self.mole.row)
+                        opts.append((far + random.random() * 2, d))
+            b.dir = min(opts)[1] if opts else (0, 0)
+            if b.dir != (0, 0):
+                n = (b.col + b.dir[0], b.row + b.dir[1])
+                b.digging = self.dirt[n[1]][n[0]]
+
+    def move_bubble(self, dt):
+        if not self.bubble:
+            return
+        x, y, d = self.bubble
+        x += d[0] * 9 * self.CELL * dt
+        y += d[1] * 9 * self.CELL * dt
+        c, r = self.cell_of((x, y))
+        if not self.inside(c, r) or self.dirt[r][c] or self.chest_at(c, r):
+            self.bubble = None
+            return
+        self.bubble = [x, y, d]
+        for b in list(self.beetles):
+            if math.dist((x, y), b.pos(self.CELL, self.ox, self.oy)) < self.CELL * 0.6:
+                self.beetles.remove(b)
+                self.bubble = None
+                self.score += 250
+                sfx("eat")
+                return
+
+    def update(self, dt):
+        if self.overlay:
+            return
+        if self.ready > 0:
+            self.ready -= dt
+            return
+        self.cool = max(0, self.cool - dt)
+        self.move_mole(dt)
+        self.update_chests(dt)
+        self.move_beetles(dt)
+        self.move_bubble(dt)
+        for p in list(self.coins):
+            self.coins[p] -= dt
+            if self.coins[p] <= 0:
+                del self.coins[p]
+        mx, my = self.mole.pos(self.CELL, self.ox, self.oy)
+        for b in self.beetles:
+            if math.dist((mx, my), b.pos(self.CELL, self.ox, self.oy)) < self.CELL * 0.6:
+                self.lives -= 1
+                sfx("lose")
+                if self.lives <= 0:
+                    self.overlay = Overlay(self.app.w("game_over"), K.RED, self.restart)
+                else:
+                    self.reset_round()
+                return
+        if not self.gems:
+            sfx("win")
+            self.overlay = Overlay(self.app.w("great"), K.GREEN, self.next_level)
+
+    # ---- drawing
+    def draw_mole(self, s, x, y):
+        c = self.CELL
+        img = pygame.Surface((c * 2, c * 2), pygame.SRCALPHA)
+        m = c
+        step = math.sin(self.app.t * 16) * 2 if self.mole.dir != (0, 0) else 0
+        pygame.draw.ellipse(img, (70, 60, 70), (m - c * 0.45, m - c * 0.35, c * 0.9, c * 0.72))
+        pygame.draw.ellipse(img, (110, 95, 110), (m - c * 0.3, m - c * 0.05, c * 0.5, c * 0.3))
+        pygame.draw.circle(img, (255, 140, 170), (int(m + c * 0.46), int(m)), int(c * 0.12))
+        pygame.draw.circle(img, K.INK, (int(m + c * 0.22), int(m - c * 0.12)), 3)
+        for k in (-1, 1):                               # little digging claws
+            pygame.draw.circle(img, (255, 200, 180), (int(m + c * 0.25 + step * k), int(m + c * 0.3)), 5)
+        if self.facing[0] < 0:
+            img = pygame.transform.flip(img, True, False)
+        s.blit(img, img.get_rect(center=(int(x), int(y))))
+
+    def draw_beetle(self, s, x, y, i):
+        c = self.CELL
+        x, y = int(x), int(y)
+        leg = math.sin(self.app.t * 18 + i) * 4
+        for k in (-1, 0, 1):
+            pygame.draw.line(s, K.INK, (x - 14, y + k * 7), (x - 21, y + k * 7 + leg), 3)
+            pygame.draw.line(s, K.INK, (x + 14, y + k * 7), (x + 21, y + k * 7 - leg), 3)
+        pygame.draw.ellipse(s, (150, 60, 200), (x - 15, y - 13, 30, 28))
+        pygame.draw.line(s, (90, 30, 130), (x, y - 12), (x, y + 14), 2)
+        pygame.draw.circle(s, (90, 30, 130), (x, y - 14), 8)
+        for k in (-1, 1):
+            pygame.draw.line(s, K.INK, (x + k * 3, y - 20), (x + k * 9, y - 27 + leg / 2), 2)
+            pygame.draw.circle(s, K.WHITE, (x + k * 4, y - 15), 3)
+
+    def draw(self, s):
+        s.blit(self.dirt_img, (0, 0))
+        c = self.CELL
+        for (gc, gr) in self.gems:
+            x, y = self.px(gc, gr)
+            pts = [(x, y - 11), (x + 10, y - 2), (x, y + 12), (x - 10, y - 2)]
+            pygame.draw.polygon(s, (60, 220, 110), pts)
+            pygame.draw.polygon(s, (190, 255, 210), [(x, y - 11), (x + 4, y - 3), (x - 4, y - 3)])
+        for (cc, cr) in self.coins:
+            x, y = self.px(cc, cr)
+            for k, (dx, dy) in enumerate(((-7, 6), (6, 7), (0, -2))):
+                pygame.draw.circle(s, (240, 180, 30), (int(x + dx), int(y + dy)), 8)
+                pygame.draw.circle(s, (255, 230, 120), (int(x + dx - 2), int(y + dy - 2)), 3)
+        for ch in self.chests:
+            x, y = self.px(ch["c"], ch["y"] if ch["state"] == "fall" else ch["r"])
+            if ch["state"] == "wobble":
+                x += math.sin(self.app.t * 40) * 3
+            box = pygame.Rect(0, 0, 34, 28)
+            box.center = (int(x), int(y) + 2)
+            pygame.draw.rect(s, (30, 18, 12), box.inflate(4, 4), border_radius=7)
+            pygame.draw.rect(s, (200, 120, 40), box, border_radius=6)
+            pygame.draw.rect(s, (160, 85, 30), (box.left, box.top, box.w, 11), border_radius=6)
+            pygame.draw.rect(s, (255, 215, 70), (box.left, box.top + 9, box.w, 4))
+            pygame.draw.rect(s, (255, 215, 70), (box.centerx - 4, box.top + 7, 8, 10), border_radius=2)
+        for i, b in enumerate(self.beetles):
+            self.draw_beetle(s, *b.pos(c, self.ox, self.oy), i)
+        self.draw_mole(s, *self.mole.pos(c, self.ox, self.oy))
+        if self.bubble:
+            pygame.draw.circle(s, (150, 220, 255), (int(self.bubble[0]), int(self.bubble[1])), 10)
+            pygame.draw.circle(s, K.WHITE, (int(self.bubble[0]) - 3, int(self.bubble[1]) - 3), 3)
+        # bubble button (right margin)
+        fb = self.fire_btn
+        ready = self.cool == 0 and not self.bubble
+        pygame.draw.circle(s, (10, 10, 30), (fb.centerx, fb.centery + 5), fb.w // 2)
+        pygame.draw.circle(s, K.CYAN if ready else (80, 90, 110), fb.center, fb.w // 2)
+        if not ready and self.cool:
+            pygame.draw.arc(s, K.WHITE, fb.inflate(-8, -8), math.pi / 2, math.pi / 2 + 2 * math.pi * (1 - self.cool / 2.5), 5)
+        pygame.draw.circle(s, K.WHITE, fb.center, 18, 4)
+        pygame.draw.circle(s, K.WHITE, (fb.centerx - 6, fb.centery - 6), 5)
+        top_bar(s, self.score, self.lives, f"{self.app.w('level')} {self.level}  ◆ {len(self.gems)}")
+        if self.ready > 0 and not self.overlay:
+            r = K.rbox(s, K.WHITE, (K.W // 2 - 110, K.H // 2 - 36, 220, 72), 24)
+            K.text(s, self.app.w("ready"), 32, K.INK, center=r.center)
+        if self.overlay:
+            self.overlay.draw(s, self.score)
+
+
+GAMES = [("bricks", Bricks), ("maze", FishMaze), ("dig", MoleDig)]
