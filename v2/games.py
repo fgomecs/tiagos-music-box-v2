@@ -22,6 +22,63 @@ def setup(kidbox_module):
     K = kidbox_module
 
 
+# ------------------------------------------------------------ sound effects
+# Little beeps made in code (no sound files). If audio isn't available the games stay silent.
+_SFX = {}
+_SR = 22050
+
+
+def _tone(notes, vol=0.35, wave="square"):
+    """notes = [(freq_start, freq_end, ms), ...] -> pygame Sound."""
+    import array
+    buf = array.array("h")
+    phase = 0.0
+    for f0, f1, ms in notes:
+        n = int(_SR * ms / 1000)
+        for i in range(n):
+            f = f0 + (f1 - f0) * i / max(1, n)
+            phase += f / _SR
+            env = min(1, i / 80) * (1 - i / n) ** 0.6          # quick attack, smooth fade
+            if f0 == 0:
+                v = random.uniform(-1, 1) * env                  # noise burst
+            elif wave == "square":
+                v = (1 if (phase % 1) < 0.5 else -1) * env * 0.6
+            else:
+                v = math.sin(phase * 2 * math.pi) * env
+            buf.append(int(v * vol * 32767))
+    return pygame.mixer.Sound(buffer=buf.tobytes())
+
+
+def sfx(name):
+    if not _SFX:
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init(_SR, -16, 1, 512)
+            _SFX.update({
+                "paddle": _tone([(330, 330, 50)]),
+                "wall": _tone([(220, 220, 30)], 0.2),
+                "brick": _tone([(660, 990, 70)]),
+                "lose": _tone([(440, 330, 150), (330, 220, 150), (220, 110, 300)], wave="sine"),
+                "win": _tone([(523, 523, 110), (659, 659, 110), (784, 784, 110), (1047, 1047, 260)], wave="sine"),
+                "launch": _tone([(300, 700, 120)], 0.25),
+                "pearl": _tone([(800, 600, 45)], 0.2),
+                "pearl2": _tone([(600, 800, 45)], 0.2),
+                "power": _tone([(300, 1200, 300)], 0.3, "sine"),
+                "eat": _tone([(400, 400, 60), (600, 600, 60), (900, 900, 120)]),
+                "tap": _tone([(1200, 1200, 25)], 0.15, "sine"),
+                "shutter": _tone([(0, 0, 90)], 0.3),
+            })
+        except Exception as e:
+            print("sfx off:", e)
+            _SFX["_off"] = True
+    snd = _SFX.get(name)
+    if snd:
+        try:
+            snd.play()
+        except Exception:
+            pass
+
+
 def touch_mouse(ev):
     """True if this mouse event was synthesised by SDL from a finger touch."""
     return getattr(ev, "touch", False)
@@ -115,6 +172,7 @@ class DrawPad:
         return b
 
     def press(self, kind, val):
+        sfx("shutter" if kind == "save" else "tap")
         if kind == "color":
             self.color, self.rainbow, self.eraser = val, False, False
         elif kind == "rainbow":
@@ -291,6 +349,7 @@ class Bricks:
     def launch(self):
         if self.stuck and not self.overlay:
             self.stuck = False
+            sfx("launch")
             a = math.radians(random.uniform(-30, 30))
             self.vel = [self.speed * math.sin(a), -self.speed * math.cos(a)]
 
@@ -356,9 +415,11 @@ class Bricks:
         if bx < R or bx > K.W - R:
             self.vel[0] = -self.vel[0]
             bx = max(R, min(K.W - R, bx))
+            sfx("wall")
         if by < TOP + R:
             self.vel[1] = abs(self.vel[1])
             by = TOP + R
+            sfx("wall")
         # paddle
         if self.vel[1] > 0 and self.paddle.top - R <= by <= self.paddle.bottom and \
                 self.paddle.left - R <= bx <= self.paddle.right + R:
@@ -366,6 +427,7 @@ class Bricks:
             a = math.radians(max(-1, min(1, off)) * 60)
             self.vel = [self.speed * math.sin(a), -self.speed * math.cos(a)]
             by = self.paddle.top - R
+            sfx("paddle")
         # bricks
         ball = pygame.Rect(bx - R, by - R, 2 * R, 2 * R)
         for i, (rect, col) in enumerate(self.bricks):
@@ -378,6 +440,7 @@ class Bricks:
                     self.vel[1] = -self.vel[1]
                 del self.bricks[i]
                 self.score += 10
+                sfx("brick")
                 for _ in range(10):
                     self.parts.append([rect.centerx, rect.centery, random.uniform(-160, 160),
                                        random.uniform(-260, 0), random.uniform(0.4, 0.8), col])
@@ -385,11 +448,13 @@ class Bricks:
         self.ball = [bx, by]
         if by > K.H + R:
             self.lives -= 1
+            sfx("lose")
             if self.lives <= 0:
                 self.overlay = Overlay(self.app.w("game_over"), K.RED, self.restart)
             else:
                 self.reset_ball()
         elif not self.bricks:
+            sfx("win")
             self.overlay = Overlay(self.app.w("great"), K.GREEN, self.next_level)
 
     def draw(self, s):
@@ -599,10 +664,13 @@ class FishMaze:
         if p in self.pearls:
             self.pearls.discard(p)
             self.score += 10
+            self.waka = not getattr(self, "waka", False)
+            sfx("pearl" if self.waka else "pearl2")
         elif p in self.power:
             self.power.discard(p)
             self.score += 50
             self.scared = 7.0
+            sfx("power")
 
     def update(self, dt):
         if self.overlay:
@@ -631,14 +699,17 @@ class FishMaze:
                 if self.scared > 0:
                     cr.dead = 3.0
                     self.score += 100
+                    sfx("eat")
                 else:
                     self.lives -= 1
+                    sfx("lose")
                     if self.lives <= 0:
                         self.overlay = Overlay(self.app.w("game_over"), K.RED, self.restart)
                     else:
                         self.reset_round()
                     return
         if not self.pearls and not self.power:
+            sfx("win")
             self.overlay = Overlay(self.app.w("great"), K.GREEN, self.next_level)
 
     # ---- drawing

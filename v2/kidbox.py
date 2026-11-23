@@ -455,6 +455,7 @@ class KidBox:
         self.thumb_cache = {}
         self.photos_dirty = False
         self.activity = None        # running Draw / game
+        threading.Thread(target=games.sfx, args=("",), daemon=True).start()   # build game sounds in the background
         self.report(playing=False, index=None, name=None, count=len(self.library), screen="color")
 
     # ---- words
