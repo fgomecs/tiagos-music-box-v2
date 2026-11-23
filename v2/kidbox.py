@@ -455,6 +455,7 @@ class KidBox:
         self.thumb_cache = {}
         self.photos_dirty = False
         self.activity = None        # running Draw / game
+        games.music_playing = self.music_on          # game sounds stay quiet while music plays
         threading.Thread(target=games.sfx, args=("",), daemon=True).start()   # build game sounds in the background
         self.report(playing=False, index=None, name=None, count=len(self.library), screen="color")
 
@@ -491,6 +492,9 @@ class KidBox:
         cmd = musicstate.take_cmd()
         if not cmd:
             return
+        if cmd in ("next",) or cmd.startswith("play "):
+            if self.busy():
+                return                      # camera / game running: ignore music requests
         if cmd == "next":
             self.next_song()
         elif cmd == "stop":
@@ -601,7 +605,22 @@ class KidBox:
         self.camera.snap(path, done)
 
     # ---- navigation
+    def music_on(self):
+        return self.player.alive() and not self.player.paused
+
+    def pause_music(self):
+        """One thing at a time: camera and games pause the music (Pi 3 can't do it all)."""
+        if self.music_on():
+            self.player.toggle()
+            self.report(playing=False)
+
+    def busy(self):
+        """Camera or a game is running: no music from the portal either."""
+        return self.page == "camera" or (self.page == "play" and not isinstance(self.activity, games.DrawPad))
+
     def start(self, cls):
+        if cls is not games.DrawPad:
+            self.pause_music()
         self.activity = cls(self)
         self.page = "play"
 
@@ -611,6 +630,7 @@ class KidBox:
         if self.page == "camera" and page != "camera":
             self.camera.close()
         if page == "camera":
+            self.pause_music()
             self.camera.open()
             self.load_photos()
         if page == "photos":

@@ -26,6 +26,7 @@ def setup(kidbox_module):
 # Little beeps made in code (no sound files). If audio isn't available the games stay silent.
 _SFX = {}
 _SR = 22050
+music_playing = lambda: False      # kidbox replaces this; no beeps over the music
 
 
 def _tone(notes, vol=0.35, wave="square"):
@@ -72,7 +73,7 @@ def sfx(name):
             print("sfx off:", e)
             _SFX["_off"] = True
     snd = _SFX.get(name)
-    if snd:
+    if snd and not music_playing():
         try:
             snd.play()
         except Exception:
