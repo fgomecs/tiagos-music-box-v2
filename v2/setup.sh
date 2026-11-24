@@ -51,17 +51,13 @@ python3 -c "import sys; sys.path.insert(0,'$P'); import config; print(f'   libra
 step "6/7 Kids app starts at boot"
 touch "$P/v2/.enabled"
 [ -f "$P/v2/settings.json" ] || echo '{"lang": "en", "video_unlocked": false, "volume": 90, "mpv_args": []}' > "$P/v2/settings.json"
-mkdir -p "$HOME/.config/autostart" "$HOME/Pictures/kidbox"
-cat > "$HOME/.config/autostart/kidbox.desktop" <<EOF
-[Desktop Entry]
-Type=Application
-Name=KidBox
-Exec=/bin/bash -c "sleep 3; /usr/bin/python3 $P/v2/kidbox.py >> $P/v2/kidbox.log 2>&1"
-X-GNOME-Autostart-enabled=true
-EOF
-echo "   autostart: ~/.config/autostart/kidbox.desktop"
-# make sure the desktop logs in automatically
-sudo raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
+mkdir -p "$HOME/Pictures/kidbox"
+# Default: no desktop, the Pi boots straight into the app (KIDBOX_DESKTOP=1 keeps the desktop)
+if [ -n "$KIDBOX_DESKTOP" ]; then
+  bash "$P/v2/appliance.sh" off
+else
+  bash "$P/v2/appliance.sh" on
+fi
 
 step "7/7 Web portal (port 8080)"
 python3 "$P/portal.py" --install

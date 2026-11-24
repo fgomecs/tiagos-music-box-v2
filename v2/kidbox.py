@@ -60,13 +60,17 @@ WORDS = {
            "delete": "Delete this photo?", "no_camera": "Camera not found",
            "saving": "Saving...", "songs": "songs", "draw": "Draw", "games": "Games",
            "bricks": "Bricks", "maze": "Fish Maze", "dig": "Mole Dig", "game_over": "Game over", "great": "Great job!",
-           "level": "Level", "tap_start": "Tap to start!", "ready": "Ready?"},
+           "level": "Level", "tap_start": "Tap to start!", "ready": "Ready?",
+           "parents": "Parents", "back": "Back", "restart": "Restart app", "shutdown": "Shut down",
+           "bye": "Shutting down… switch the battery off when the green light stops blinking"},
     "es": {"music": "Música", "camera": "Cámara", "photos": "Fotos",
            "nothing": "¡Toca una canción!", "no_photos": "¡Todavía no hay fotos!",
            "delete": "¿Borrar esta foto?", "no_camera": "No hay cámara",
            "saving": "Guardando...", "songs": "canciones", "draw": "Dibujar", "games": "Juegos",
            "bricks": "Ladrillos", "maze": "Pez Laberinto", "dig": "Topo Excavador", "game_over": "Fin del juego", "great": "¡Muy bien!",
-           "level": "Nivel", "tap_start": "¡Toca para empezar!", "ready": "¿Listo?"},
+           "level": "Nivel", "tap_start": "¡Toca para empezar!", "ready": "¿Listo?",
+           "parents": "Padres", "back": "Volver", "restart": "Reiniciar app", "shutdown": "Apagar",
+           "bye": "Apagando… apaga la batería cuando la luz verde deje de parpadear"},
 }
 
 # alsa_device: play straight to the sound card (like V1) instead of through the desktop's
@@ -496,6 +500,8 @@ class KidBox:
         self.confirm_delete = False
         self.flash = 0
         self.press = None           # (pos, time) for swipe / long press
+        self.quit_app = False
+        self.bye = False
         self.dragging = False
         self.last_mirror = 0
         self.thumb_cache = {}
@@ -970,6 +976,32 @@ class KidBox:
                 size -= 2
             text(s, label, size, WHITE, center=(r.centerx, r.bottom - 48))
 
+    def draw_parent(self, dt):
+        """Hidden parent menu (hold the top-left corner 5 s): back, restart app, shut down."""
+        s = self.screen
+        s.fill((20, 24, 40))
+        if self.bye:
+            text(s, self.w("bye"), 24, WHITE, center=(W // 2, H // 2), maxw=W - 40)
+            return
+        text(s, self.w("parents"), 40, WHITE, center=(W // 2, 70))
+        items = [("back", BLUE, lambda: self.go("home")),
+                 ("restart", ORANGE, self.restart_app),
+                 ("shutdown", RED, self.shutdown)]
+        for i, (key, color, act) in enumerate(items):
+            r = pygame.Rect(60 + i * 235, 170, 210, 170)
+            self.btn(r, act)
+            rbox(s, color, r, 28)
+            text(s, self.w(key), 28, WHITE, center=r.center, maxw=r.w - 16)
+
+    def restart_app(self):
+        self.quit_app = True          # the boot service starts the app again in ~2 s
+
+    def shutdown(self):
+        self.bye = True
+        self.player.stop()
+        self.camera.close()
+        subprocess.Popen(["sudo", "-n", "/sbin/poweroff"])
+
     def draw_play(self, dt):
         self.activity.update(dt)
         self.activity.draw(self.screen)
@@ -1012,6 +1044,13 @@ class KidBox:
             self.t += dt
             for ev in pygame.event.get():
                 running = self.handle(ev) and running
+            if (self.press and self.page != "parent" and pygame.mouse.get_pressed()[0]
+                    and pygame.Rect(0, 0, 90, 90).collidepoint(self.press[0])
+                    and now - self.press[1] > 5):           # hidden parent menu: hold top-left 5 s
+                self.press = None
+                self.go("parent")
+            if self.quit_app:
+                running = False
             if not self.player.poll():                # song finished by itself
                 self.report(playing=False)
             self.portal_commands()
