@@ -332,7 +332,7 @@ class Bricks:
         self.app = app
         self.score, self.lives, self.level = 0, 3, 1
         self.paddle = pygame.Rect(0, 0, 150, 18)
-        self.paddle.center = (K.W // 2, 440)
+        self.paddle.center = (K.W // 2, 360)   # high enough that the finger below doesn't hide it
         self.parts = []
         self.overlay = None
         self.down = None
@@ -464,7 +464,7 @@ class Bricks:
                                        random.uniform(-260, 0), random.uniform(0.4, 0.8), col])
                 break
         self.ball = [bx, by]
-        if by > K.H + R:
+        if by > self.paddle.bottom + 60:
             self.lives -= 1
             sfx("lose")
             if self.lives <= 0:
@@ -483,6 +483,12 @@ class Bricks:
             pygame.draw.rect(s, (255, 255, 255), (rect.left + 8, rect.top + 5, rect.w - 16, 5), border_radius=3)
         for x, y, _, _, life, col in self.parts:
             pygame.draw.circle(s, col, (int(x), int(y)), max(1, int(life * 8)))
+        zone = pygame.Rect(20, self.paddle.bottom + 22, K.W - 40, K.H - self.paddle.bottom - 32)
+        pygame.draw.rect(s, (255, 255, 255), zone, 2, border_radius=18)       # "slide your finger here"
+        for k in (-1, 1):
+            cx = K.W // 2 + k * 60
+            pygame.draw.polygon(s, (200, 210, 255), [(cx + k * 18, zone.centery), (cx, zone.centery - 14), (cx, zone.centery + 14)])
+        pygame.draw.circle(s, (200, 210, 255), (K.W // 2, zone.centery), 10, 3)
         pygame.draw.rect(s, (10, 10, 30), self.paddle.move(0, 4), border_radius=9)
         pygame.draw.rect(s, K.CYAN, self.paddle, border_radius=9)
         bx, by = self.ball
@@ -490,7 +496,7 @@ class Bricks:
         pygame.draw.circle(s, K.YELLOW, (int(bx) - 3, int(by) - 3), 4)
         top_bar(s, self.score, self.lives, f"{self.app.w('level')} {self.level}")
         if self.stuck and not self.overlay:
-            K.text(s, self.app.w("tap_start"), 30, K.WHITE, center=(K.W // 2, 330))
+            K.text(s, self.app.w("tap_start"), 30, K.WHITE, center=(K.W // 2, 280))
         if self.overlay:
             self.overlay.draw(s, self.score)
 
@@ -798,7 +804,8 @@ class MoleDig:
         self.oy = TOP + (K.H - TOP - self.ROWS * self.CELL) // 2
         self.fire_btn = pygame.Rect(K.W - 92, K.H - 120, 84, 84)
         self.overlay = None
-        self.target = None              # finger position while held
+        self.heading = (0, 0)           # keeps digging this way until blocked (like Pac-Man)
+        self.down = None
         self.new_level()
 
     # ---- level
@@ -833,6 +840,7 @@ class MoleDig:
     def reset_round(self):
         self.mole = Mover(*self.start, 4.2)
         self.facing = (1, 0)
+        self.heading = (0, 0)
         self.beetles = []
         self.spawned = 0
         self.spawn_t = 2.5
@@ -899,38 +907,41 @@ class MoleDig:
                 pygame.draw.rect(self.dirt_img, (30, 18, 12), rect.move(dc * self.CELL // 2, dr * self.CELL // 2), border_radius=6)
         self.dist_from = None                           # tunnels changed: recompute beetle paths
 
-    # ---- input
+    # ---- input: swipe or tap to steer (the mole keeps going), round button shoots
     def handle(self, ev):
-        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_SPACE:
-            self.fire()
+        if ev.type == pygame.KEYDOWN:
+            if ev.key == pygame.K_SPACE:
+                self.fire()
+            m = {pygame.K_LEFT: "L", pygame.K_RIGHT: "R", pygame.K_UP: "U", pygame.K_DOWN: "D"}.get(ev.key)
+            if m:
+                self.heading = DIRS[m]
         elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             if self.overlay:
                 return
             if self.fire_btn.collidepoint(ev.pos):
                 self.fire()
+                self.down = None
             elif ev.pos[1] > TOP:
-                self.target = ev.pos
-        elif ev.type == pygame.MOUSEMOTION and ev.buttons[0] and self.target:
-            self.target = ev.pos
+                self.down, self.swiped = ev.pos, False
+        elif ev.type == pygame.MOUSEMOTION and ev.buttons[0] and self.down:
+            dx, dy = ev.pos[0] - self.down[0], ev.pos[1] - self.down[1]
+            if max(abs(dx), abs(dy)) > 30:                       # swipe: turn right away
+                self.heading = DIRS["R" if dx > 0 else "L"] if abs(dx) > abs(dy) else DIRS["D" if dy > 0 else "U"]
+                self.down, self.swiped = ev.pos, True
         elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
             if self.overlay:
                 self.overlay.tap(ev.pos)
-            self.target = None
+            elif self.down and not self.swiped:                  # tap: go toward the finger, tap the mole to stop
+                mx, my = self.mole.pos(self.CELL, self.ox, self.oy)
+                dx, dy = ev.pos[0] - mx, ev.pos[1] - my
+                if max(abs(dx), abs(dy)) < self.CELL * 0.7:
+                    self.heading = (0, 0)
+                else:
+                    self.heading = DIRS["R" if dx > 0 else "L"] if abs(dx) > abs(dy) else DIRS["D" if dy > 0 else "U"]
+            self.down = None
 
     def want(self):
-        keys = pygame.key.get_pressed()
-        for k, d in ((pygame.K_LEFT, "L"), (pygame.K_RIGHT, "R"), (pygame.K_UP, "U"), (pygame.K_DOWN, "D")):
-            if keys[k]:
-                return [DIRS[d]]
-        if not self.target:
-            return []
-        tc, tr = self.cell_of(self.target)
-        dc, dr = tc - self.mole.col, tr - self.mole.row
-        if dc == 0 and dr == 0:
-            return []
-        h = [(1 if dc > 0 else -1, 0)] if dc else []
-        v = [(0, 1 if dr > 0 else -1)] if dr else []
-        return h + v if abs(dc) >= abs(dr) else v + h
+        return [self.heading] if self.heading != (0, 0) else []
 
     def can_enter(self, d):
         c, r = self.mole.col + d[0], self.mole.row + d[1]
@@ -949,12 +960,18 @@ class MoleDig:
         return True
 
     def fire(self):
+        """The bubble finds the nearest beetle by itself (no aiming needed)."""
         if self.cool > 0 or self.bubble or self.overlay or self.ready > 0:
             return
         x, y = self.mole.pos(self.CELL, self.ox, self.oy)
-        self.bubble = [x, y, self.facing]
+        self.bubble = {"x": x, "y": y, "d": self.facing, "target": self.nearest_beetle(x, y)}
         self.cool = 2.5
         sfx("launch")
+
+    def nearest_beetle(self, x, y):
+        if not self.beetles:
+            return None
+        return min(self.beetles, key=lambda b: math.dist((x, y), b.pos(self.CELL, self.ox, self.oy)))
 
     # ---- update
     def move_mole(self, dt):
@@ -1084,23 +1101,32 @@ class MoleDig:
                 b.digging = self.dirt[n[1]][n[0]]
 
     def move_bubble(self, dt):
-        if not self.bubble:
+        bb = self.bubble
+        if not bb:
             return
-        x, y, d = self.bubble
-        x += d[0] * 9 * self.CELL * dt
-        y += d[1] * 9 * self.CELL * dt
-        c, r = self.cell_of((x, y))
-        if not self.inside(c, r) or self.dirt[r][c] or self.chest_at(c, r):
-            self.bubble = None
-            return
-        self.bubble = [x, y, d]
-        for b in list(self.beetles):
-            if math.dist((x, y), b.pos(self.CELL, self.ox, self.oy)) < self.CELL * 0.6:
-                self.beetles.remove(b)
+        if bb["target"] is not None and bb["target"] not in self.beetles:
+            bb["target"] = self.nearest_beetle(bb["x"], bb["y"])          # it got squashed: pick another
+        speed = 8 * self.CELL * dt
+        if bb["target"] is not None:                                      # homing: fly straight at it
+            tx, ty = bb["target"].pos(self.CELL, self.ox, self.oy)
+            dist = math.dist((bb["x"], bb["y"]), (tx, ty))
+            if dist <= max(speed, self.CELL * 0.5):
+                self.beetles.remove(bb["target"])
                 self.bubble = None
                 self.score += 250
                 sfx("eat")
                 return
+            bb["x"] += (tx - bb["x"]) / dist * speed
+            bb["y"] += (ty - bb["y"]) / dist * speed
+            return
+        d = bb["d"]                                                      # no beetles: straight shot
+        bb["x"] += d[0] * speed
+        bb["y"] += d[1] * speed
+        c, r = self.cell_of((bb["x"], bb["y"]))
+        if not self.inside(c, r) or self.dirt[r][c] or self.chest_at(c, r):
+            self.bubble = None
+        elif self.beetles:
+            bb["target"] = self.nearest_beetle(bb["x"], bb["y"])
 
     def update(self, dt):
         if self.overlay:
@@ -1189,8 +1215,9 @@ class MoleDig:
             self.draw_beetle(s, *b.pos(c, self.ox, self.oy), i)
         self.draw_mole(s, *self.mole.pos(c, self.ox, self.oy))
         if self.bubble:
-            pygame.draw.circle(s, (150, 220, 255), (int(self.bubble[0]), int(self.bubble[1])), 10)
-            pygame.draw.circle(s, K.WHITE, (int(self.bubble[0]) - 3, int(self.bubble[1]) - 3), 3)
+            bx, by = int(self.bubble["x"]), int(self.bubble["y"])
+            pygame.draw.circle(s, (150, 220, 255), (bx, by), 10)
+            pygame.draw.circle(s, K.WHITE, (bx - 3, by - 3), 3)
         # bubble button (right margin)
         fb = self.fire_btn
         ready = self.cool == 0 and not self.bubble

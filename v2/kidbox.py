@@ -31,6 +31,7 @@ import time
 import pygame
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+DIGGER_BIN = os.path.join(HERE, "bin", "digger")     # built by v2/install_digger.sh
 PROJECT = os.path.dirname(HERE)
 sys.path.insert(0, PROJECT)
 
@@ -59,7 +60,7 @@ WORDS = {
            "nothing": "Tap a song!", "no_photos": "No photos yet. Take one!",
            "delete": "Delete this photo?", "no_camera": "Camera not found",
            "saving": "Saving...", "songs": "songs", "draw": "Draw", "games": "Games",
-           "bricks": "Bricks", "maze": "Fish Maze", "dig": "Mole Dig", "game_over": "Game over", "great": "Great job!",
+           "bricks": "Bricks", "maze": "Fish Maze", "dig": "Mole Dig", "digger": "Digger", "game_over": "Game over", "great": "Great job!",
            "level": "Level", "tap_start": "Tap to start!", "ready": "Ready?",
            "parents": "Parents", "back": "Back", "restart": "Restart app", "shutdown": "Shut down",
            "bye": "Shutting down… switch the battery off when the green light stops blinking"},
@@ -67,7 +68,7 @@ WORDS = {
            "nothing": "¡Toca una canción!", "no_photos": "¡Todavía no hay fotos!",
            "delete": "¿Borrar esta foto?", "no_camera": "No hay cámara",
            "saving": "Guardando...", "songs": "canciones", "draw": "Dibujar", "games": "Juegos",
-           "bricks": "Ladrillos", "maze": "Pez Laberinto", "dig": "Topo Excavador", "game_over": "Fin del juego", "great": "¡Muy bien!",
+           "bricks": "Ladrillos", "maze": "Pez Laberinto", "dig": "Topo Excavador", "digger": "Digger", "game_over": "Fin del juego", "great": "¡Muy bien!",
            "level": "Nivel", "tap_start": "¡Toca para empezar!", "ready": "¿Listo?",
            "parents": "Padres", "back": "Volver", "restart": "Reiniciar app", "shutdown": "Apagar",
            "bye": "Apagando… apaga la batería cuando la luz verde deje de parpadear"},
@@ -444,23 +445,125 @@ class Bubbles:
             pygame.draw.circle(surf, WHITE, (int(x - b[2] * .35), int(b[1] - b[2] * .35)), max(2, int(b[2] * .18)))
 
 
-class Fish:
-    def __init__(self):
-        self.x, self.y, self.t, self.dir = -80, 400, 0, 1
+class Sea:
+    """Animated sea behind the home and music screens: fish, a turtle, a jellyfish, an octopus,
+    a crab walking on the sand, a whale passing by, swaying seaweed. Livelier while music plays."""
 
-    def draw(self, surf, dt):
-        self.t += dt
-        self.x += 70 * dt * self.dir
-        if self.x > W + 80 or self.x < -80:
-            self.dir *= -1
-            self.y = random.randint(330, 440)
-        y = self.y + math.sin(self.t * 3) * 10
-        d = self.dir
-        pygame.draw.ellipse(surf, ORANGE, (self.x - 36, y - 20, 72, 40))
-        tail = [(self.x - d * 30, y), (self.x - d * 58, y - 20), (self.x - d * 58, y + 20)]
-        pygame.draw.polygon(surf, ORANGE, tail)
-        pygame.draw.circle(surf, WHITE, (int(self.x + d * 18), int(y - 6)), 8)
-        pygame.draw.circle(surf, INK, (int(self.x + d * 20), int(y - 6)), 4)
+    def __init__(self):
+        r = random.Random(7)
+        self.t = 0
+        self.fish = [dict(x=r.uniform(0, W), y=y, d=d, sp=sp, col=col, size=sz)
+                     for y, d, sp, col, sz in ((120, 1, 60, ORANGE, 1.0), (250, -1, 45, YELLOW, 0.8),
+                                               (330, 1, 75, (255, 110, 150), 0.7), (190, -1, 55, CYAN, 0.9))]
+        self.turtle = dict(x=-120, y=200, d=1)
+        self.jelly = dict(x=640, y=300)
+        self.octo = dict(x=110, y=395)
+        self.crab = dict(x=300, d=1)
+        self.whale = dict(x=W + 400, y=150, wait=8)
+        self.weeds = [(30 + i * 95 + r.randint(-20, 20), r.randint(60, 110)) for i in range(9)]
+
+    def draw(self, s, dt, lively=1.0):
+        self.t += dt * lively
+        t = self.t
+        # far away: the whale (every so often)
+        w = self.whale
+        if w["wait"] > 0:
+            w["wait"] -= dt
+        else:
+            w["x"] -= 35 * dt * lively
+            x, y = int(w["x"]), int(w["y"] + math.sin(t) * 6)
+            col = (70, 90, 170)
+            pygame.draw.ellipse(s, col, (x - 110, y - 40, 220, 80))
+            pygame.draw.polygon(s, col, [(x + 100, y), (x + 150, y - 34), (x + 150, y + 30)])
+            pygame.draw.ellipse(s, (130, 150, 220), (x - 90, y + 8, 150, 28))
+            pygame.draw.circle(s, WHITE, (x - 70, y - 10), 6)
+            pygame.draw.circle(s, INK, (x - 72, y - 10), 3)
+            for k in range(3):                                   # water spout
+                pygame.draw.circle(s, (180, 220, 255), (x - 40 + (k - 1) * 10, y - 52 - k * 6 - int(abs(math.sin(t * 3)) * 8)), 5)
+            if w["x"] < -300:
+                w.update(x=W + 400, y=random.randint(110, 200), wait=random.uniform(15, 30))
+        # sand + seaweed
+        pygame.draw.ellipse(s, (205, 175, 110), (-60, H - 34, W + 120, 80))
+        for i, (x, hgt) in enumerate(self.weeds):
+            pts = []
+            for k in range(7):
+                yy = H - 18 - k * hgt / 6
+                pts.append((x + math.sin(t * 1.5 + i + k * 0.6) * k * 2.2, yy))
+            pygame.draw.lines(s, (40, 160, 90) if i % 2 else (60, 190, 110), False, pts, 7)
+        # fish
+        for f in self.fish:
+            f["x"] += f["sp"] * dt * f["d"] * lively
+            if f["x"] > W + 90 or f["x"] < -90:
+                f["d"] *= -1
+                f["y"] = random.randint(90, 380)
+            self.draw_fish(s, f["x"], f["y"] + math.sin(t * 3 + f["sp"]) * 10, f["d"], f["col"], f["size"])
+        # turtle
+        tu = self.turtle
+        tu["x"] += 30 * dt * tu["d"] * lively
+        if tu["x"] > W + 130 or tu["x"] < -130:
+            tu["d"] *= -1
+            tu["y"] = random.randint(140, 320)
+        self.draw_turtle(s, tu["x"], tu["y"] + math.sin(t * 1.3) * 12, tu["d"], t)
+        # jellyfish (drifts up, sinks back)
+        j = self.jelly
+        jy = j["y"] + math.sin(t * 0.8) * 60
+        jx = j["x"] + math.sin(t * 0.3) * 40
+        pulse = 1 + math.sin(t * 4) * 0.12
+        for k in range(5):
+            pts = [(jx - 24 + k * 12 + math.sin(t * 3 + k + n * 0.8) * 5, jy + n * 9) for n in range(6)]
+            pygame.draw.lines(s, (255, 170, 220), False, pts, 3)
+        pygame.draw.ellipse(s, (255, 140, 210), (jx - 32 * pulse, jy - 28, 64 * pulse, 40))
+        pygame.draw.circle(s, INK, (int(jx - 10), int(jy - 10)), 3)
+        pygame.draw.circle(s, INK, (int(jx + 10), int(jy - 10)), 3)
+        # octopus on the bottom left
+        o = self.octo
+        ox, oy = o["x"], o["y"] + math.sin(t * 2) * 6
+        for k in range(8):
+            base = ox - 28 + k * 8
+            pts = [(base + math.sin(t * 3 + k + n * 0.9) * 6 + (k - 3.5) * n * 2.4, oy + 14 + n * 8) for n in range(6)]
+            pygame.draw.lines(s, (160, 90, 220), False, pts, 6)
+        pygame.draw.circle(s, (170, 100, 230), (int(ox), int(oy)), 30)
+        for k in (-1, 1):
+            pygame.draw.circle(s, WHITE, (int(ox + k * 11), int(oy - 4)), 8)
+            pygame.draw.circle(s, INK, (int(ox + k * 11), int(oy - 3)), 4)
+        # crab walking on the sand
+        c = self.crab
+        c["x"] += 40 * dt * c["d"] * lively
+        if c["x"] > W - 40 or c["x"] < 200:
+            c["d"] *= -1
+        cx, cy = int(c["x"]), H - 24
+        leg = math.sin(t * 14) * 4
+        for k in (-1, 1):
+            for n in range(3):
+                pygame.draw.line(s, (220, 60, 50), (cx + k * 10, cy + n * 3), (cx + k * (24 + n * 3), cy + 8 + n * 3 + leg * k), 3)
+            claw = abs(math.sin(t * 3)) * 6
+            pygame.draw.circle(s, (230, 70, 60), (cx + k * 28, cy - 14), 9)
+            pygame.draw.line(s, (40, 30, 60), (cx + k * 28, cy - 14), (cx + k * (34 + claw), cy - 20), 3)
+        pygame.draw.ellipse(s, (235, 80, 65), (cx - 20, cy - 14, 40, 24))
+        for k in (-1, 1):
+            pygame.draw.line(s, (235, 80, 65), (cx + k * 6, cy - 12), (cx + k * 8, cy - 24), 3)
+            pygame.draw.circle(s, WHITE, (cx + k * 8, cy - 26), 4)
+            pygame.draw.circle(s, INK, (cx + k * 8, cy - 26), 2)
+
+    @staticmethod
+    def draw_fish(s, x, y, d, col, k=1.0):
+        pygame.draw.ellipse(s, col, (x - 36 * k, y - 20 * k, 72 * k, 40 * k))
+        tail = [(x - d * 30 * k, y), (x - d * 58 * k, y - 20 * k), (x - d * 58 * k, y + 20 * k)]
+        pygame.draw.polygon(s, col, tail)
+        pygame.draw.circle(s, WHITE, (int(x + d * 18 * k), int(y - 6 * k)), int(8 * k))
+        pygame.draw.circle(s, INK, (int(x + d * 20 * k), int(y - 6 * k)), int(4 * k))
+
+    @staticmethod
+    def draw_turtle(s, x, y, d, t):
+        fl = math.sin(t * 4) * 10
+        green, dark = (90, 190, 110), (50, 130, 80)
+        for k in (-1, 1):                                        # flippers paddling
+            pygame.draw.ellipse(s, green, (x + k * 22 - 14, y + (12 if k > 0 else -30) + fl * k * 0.5, 28, 18))
+        pygame.draw.circle(s, green, (int(x + d * 52), int(y)), 15)          # head
+        pygame.draw.circle(s, INK, (int(x + d * 58), int(y - 4)), 3)
+        pygame.draw.ellipse(s, dark, (x - 45, y - 28, 90, 56))                 # shell
+        for hx, hy in ((0, 0), (-22, -8), (22, -8), (-20, 10), (20, 10)):
+            pygame.draw.circle(s, green, (int(x + hx), int(y + hy)), 9)
 
 
 # ---------------------------------------------------------------- the app
@@ -479,10 +582,7 @@ class KidBox:
         pygame.mixer.quit()                        # don't hold the sound card; mpv needs it
         # SCALED: always draw on an 800x480 canvas and let SDL stretch it to whatever
         # the display really is (the 4.3" panel is 800x480; a headless/HDMI desktop is bigger)
-        flags = pygame.SCALED if os.environ.get("KIDBOX_WINDOW") else (pygame.FULLSCREEN | pygame.SCALED)
-        self.screen = pygame.display.set_mode((W, H), flags)
-        pygame.display.set_caption("KidBox")
-        pygame.mouse.set_visible(bool(os.environ.get("KIDBOX_WINDOW")))
+        self.open_display()
         self.clock = pygame.time.Clock()
         self.settings = load_settings()
         self.library = load_library()
@@ -492,7 +592,7 @@ class KidBox:
         self.buttons = []           # (rect, action) rebuilt every frame
         self.bg = pygame.Surface((W, H))
         gradient(self.bg, BG_TOP, BG_BOT)
-        self.bubbles, self.fish = Bubbles(), Fish()
+        self.bubbles, self.sea = Bubbles(), Sea()
         self.t = 0
         self.scroll = 0             # music list scroll (px)
         self.photos, self.photo_i, self.grid_page = [], 0, 0
@@ -664,6 +764,42 @@ class KidBox:
         self.camera.snap(path, done)
 
     # ---- navigation
+    def open_display(self):
+        flags = pygame.SCALED if os.environ.get("KIDBOX_WINDOW") else (pygame.FULLSCREEN | pygame.SCALED)
+        self.screen = pygame.display.set_mode((W, H), flags)
+        pygame.display.set_caption("KidBox")
+        pygame.mouse.set_visible(bool(os.environ.get("KIDBOX_WINDOW")))
+
+    def launch_digger(self):
+        """Run the real Digger (Digger Remastered) full screen, then come back to the games menu.
+        Our app lets go of the screen and sound while it runs; digger_touch.py turns swipes/taps into keys."""
+        self.pause_music()
+        games.audio_off()
+        pygame.display.quit()
+        env = dict(os.environ)
+        dev = self.settings.get("alsa_device")
+        if dev:
+            env.update(SDL_AUDIODRIVER="alsa", AUDIODEV=dev)
+        helper = None
+        try:
+            helper = subprocess.Popen(["sudo", "-n", "/usr/bin/python3", os.path.join(HERE, "digger_touch.py")])
+            subprocess.run([DIGGER_BIN, "/F"], cwd=os.path.dirname(DIGGER_BIN), env=env)
+        except Exception as e:
+            print("digger:", e, flush=True)
+        finally:
+            if helper:
+                helper.terminate()
+                try:
+                    helper.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    helper.kill()
+            pygame.display.init()
+            self.open_display()
+            pygame.event.clear()
+            self.press, self.finger, self.held = None, None, False
+            self.go("games")
+            self.player.warm()
+
     def music_on(self):
         return self.player.alive() and not self.player.paused
 
@@ -803,8 +939,8 @@ class KidBox:
     def draw_home(self, dt):
         s = self.screen
         s.blit(self.bg, (0, 0))
+        self.sea.draw(s, dt)
         self.bubbles.draw(s, dt)
-        self.fish.draw(s, dt)
         top = [("music", PINK, icon_note, lambda: self.go("music")),
                ("camera", CYAN, icon_camera, lambda: self.go("camera")),
                ("photos", YELLOW, icon_photo, lambda: self.go("photos"))]
@@ -835,6 +971,7 @@ class KidBox:
         s = self.screen
         s.blit(self.bg, (0, 0))
         playing = self.player.alive() and not self.player.paused
+        self.sea.draw(s, dt, 1.8 if playing else 0.5)            # sea animals dance faster with music
         self.bubbles.draw(s, dt, 2.2 if playing else 0.6)
         self.home_button()
 
@@ -963,14 +1100,15 @@ class KidBox:
         s.blit(self.bg, (0, 0))
         self.bubbles.draw(s, dt)
         self.home_button()
-        colors = {"bricks": PINK, "maze": BLUE, "dig": ORANGE}
-        n = len(games.GAMES)
-        tw = 220 if n > 2 else 315
+        colors = {"bricks": PINK, "maze": BLUE, "dig": ORANGE, "digger": (40, 40, 48)}
+        entries = list(games.GAMES) + ([("digger", None)] if os.path.exists(DIGGER_BIN) else [])
+        n = len(entries)
+        tw = min(315, (W - (n + 1) * 20) // n)
         gap = (W - n * tw) // (n + 1)
-        for i, (key, cls) in enumerate(games.GAMES):
+        for i, (key, cls) in enumerate(entries):
             bob = math.sin(self.t * 2 + i) * 5
             r = pygame.Rect(gap + i * (tw + gap), 100 + bob, tw, 300)
-            self.btn(r, lambda c=cls: self.start(c))
+            self.btn(r, (lambda c=cls: self.start(c)) if cls else self.launch_digger)
             rbox(s, colors.get(key, CYAN), r, 34)
             prev = pygame.Rect(r.left + 18, r.top + 20, r.w - 36, 180)
             pygame.draw.rect(s, (14, 30, 70), prev, border_radius=20)
@@ -991,6 +1129,15 @@ class KidBox:
                 pygame.draw.polygon(s, (255, 120, 40), [(fx - 18, cy), (fx - 36, cy - 14), (fx - 36, cy + 14)])
                 pygame.draw.circle(s, INK, (int(fx + 10), cy - 4), 4)
                 pygame.draw.ellipse(s, (255, 90, 70), (prev.left + 24, prev.top + 22, 40, 28))
+            elif key == "digger":
+                pygame.draw.rect(s, (0, 0, 0), prev, border_radius=20)
+                for k in range(4):                                     # retro dirt rows
+                    pygame.draw.rect(s, (170, 0, 170) if k % 2 else (0, 170, 170),
+                                     (prev.left + 10, prev.top + 22 + k * 36, prev.w - 20, 14))
+                for gx in (prev.left + 30, cx, prev.right - 30):
+                    gy = prev.top + 50
+                    pygame.draw.polygon(s, (0, 200, 0), [(gx, gy - 9), (gx + 8, gy), (gx, gy + 9), (gx - 8, gy)])
+                pygame.draw.circle(s, (220, 40, 40), (cx, prev.bottom - 34), 12)
             else:
                 pygame.draw.rect(s, (138, 88, 46), prev.inflate(-16, -16), border_radius=14)
                 pygame.draw.rect(s, (30, 18, 12), (prev.left + 20, cy - 12, prev.w - 40, 26), border_radius=10)
