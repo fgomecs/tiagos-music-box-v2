@@ -783,7 +783,17 @@ class KidBox:
         helper = None
         try:
             helper = subprocess.Popen(["sudo", "-n", "/usr/bin/python3", os.path.join(HERE, "digger_touch.py")])
-            subprocess.run([DIGGER_BIN, "/F"], cwd=os.path.dirname(DIGGER_BIN), env=env)
+            env.setdefault("DIGGER_INITIALS", "TIA")
+            game = subprocess.Popen([DIGGER_BIN, "/F"], cwd=os.path.dirname(DIGGER_BIN), env=env)
+            while game.poll() is None:                    # corner hold -> helper drops the quit flag
+                if os.path.exists("/tmp/kidbox-digger-quit"):
+                    game.terminate()
+                    try:
+                        game.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        game.kill()
+                    break
+                time.sleep(0.2)
         except Exception as e:
             print("digger:", e, flush=True)
         finally:

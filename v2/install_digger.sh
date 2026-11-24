@@ -10,6 +10,20 @@ echo "== packages"
 sudo apt-get install -y git cmake libsdl2-dev zlib1g-dev python3-evdev
 echo "== source"
 if [ -d "$SRC/.git" ]; then git -C "$SRC" pull --ff-only; else git clone --depth 1 https://github.com/sobomax/digger "$SRC"; fi
+echo "== touchscreen tweak: no keyboard needed for high scores (initials are filled in automatically)"
+python3 - "$SRC/scores.c" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+if "DIGGER_INITIALS" not in s:
+    s = s.replace("      getinitials(ddap);",
+        '      { const char *ini = getenv("DIGGER_INITIALS"); int k;'
+        '        strcpy(scoreinit[0], "...");'
+        '        for (k = 0; k < 3 && ini && ini[k]; k++) scoreinit[0][k] = ini[k];'
+        '        if (!ini) memcpy(scoreinit[0], "TIA", 3);'
+        '        recputinit(scoreinit[0]); }', 1)
+    open(p, "w").write(s)
+    print("   patched scores.c")
+PY
 echo "== build (be patient on a Pi 3)"
 mkdir -p "$SRC/build" && cd "$SRC/build"
 cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null

@@ -6,11 +6,14 @@ Digger only understands the keyboard, so this reads the touchscreen and presses 
 on a virtual keyboard:
   * swipe          -> Digger turns and KEEPS going that way (like Pac-Man)
   * tap            -> fire (F1) / start a game on the title screen
-  * hold top-left corner 3 s -> quit Digger (F10 twice) and go back to Tiago's games
+  * hold any corner 3 s -> quit Digger and go back to Tiago's games
 """
+import os
 import select
 import sys
 import time
+
+QUIT_FLAG = "/tmp/kidbox-digger-quit"      # kidbox closes Digger when this appears
 
 from evdev import InputDevice, UInput, ecodes as e, list_devices
 
@@ -30,7 +33,12 @@ def find_touch():
 
 
 def main():
+    try:
+        os.remove(QUIT_FLAG)
+    except FileNotFoundError:
+        pass
     dev = find_touch()
+    print("digger_touch: using", dev.path if dev else None, dev.name if dev else "", flush=True)
     if not dev:
         print("digger_touch: no touchscreen found", flush=True)
         time.sleep(3600)
@@ -45,6 +53,7 @@ def main():
     start = None
     swiped = False
     quit_sent = False
+    saw_btn = False
 
     def tap(k):
         ui.write(e.EV_KEY, k, 1); ui.syn(); time.sleep(0.06)
@@ -59,31 +68,43 @@ def main():
         ui.write(e.EV_KEY, k, 1); ui.syn()
         held = k
 
+    touching = False
+
+    def finger(is_down):
+        nonlocal touching, down, start, swiped, quit_sent
+        if is_down:
+            if not touching:
+                touching, down, start, swiped, quit_sent = True, None, None, False, False
+        else:
+            if touching and down and not swiped and not quit_sent and time.time() - down[2] < TAP_MAX:
+                tap(e.KEY_F1)                                    # tap = fire / start a game
+            touching, down = False, None
+
     try:
         while True:
             r, _, _ = select.select([dev.fd], [], [], 0.1)
             now = time.time()
-            if down and not swiped and not quit_sent and down[0] < 0.12 and down[1] < 0.18 and now - down[2] > QUIT_HOLD:
+            in_corner = touching and down and (down[0] < 0.15 or down[0] > 0.85) and (down[1] < 0.2 or down[1] > 0.8)
+            if in_corner and not swiped and not quit_sent and now - down[2] > QUIT_HOLD:
                 quit_sent = True
+                print("digger_touch: corner hold -> quit", flush=True)
                 if held:
                     ui.write(e.EV_KEY, held, 0); ui.syn(); held = None
-                tap(e.KEY_F10); time.sleep(0.4); tap(e.KEY_F10)
+                open(QUIT_FLAG, "w").close()
             if not r:
                 continue
             for ev in dev.read():
-                if ev.type == e.EV_ABS:
-                    if ev.code in (e.ABS_MT_POSITION_X, e.ABS_X):
-                        x = (ev.value - ax.min) / max(1, ax.max - ax.min)
-                    elif ev.code in (e.ABS_MT_POSITION_Y, e.ABS_Y):
-                        y = (ev.value - ay.min) / max(1, ay.max - ay.min)
-                elif ev.type == e.EV_KEY and ev.code == e.BTN_TOUCH:
-                    if ev.value == 1:
-                        down, start, swiped, quit_sent = None, None, False, False
-                    else:
-                        if down and not swiped and not quit_sent and time.time() - down[2] < TAP_MAX:
-                            tap(e.KEY_F1)                     # fire / start
-                        down = None
-                elif ev.type == e.EV_SYN and x is not None and y is not None:
+                if ev.type == e.EV_KEY and ev.code == e.BTN_TOUCH:
+                    saw_btn = True
+                    finger(ev.value == 1)
+                elif ev.type == e.EV_ABS and ev.code == e.ABS_MT_TRACKING_ID:
+                    if not saw_btn:                              # panels without BTN_TOUCH
+                        finger(ev.value >= 0)
+                elif ev.type == e.EV_ABS and ev.code in (e.ABS_MT_POSITION_X, e.ABS_X):
+                    x = (ev.value - ax.min) / max(1, ax.max - ax.min)
+                elif ev.type == e.EV_ABS and ev.code in (e.ABS_MT_POSITION_Y, e.ABS_Y):
+                    y = (ev.value - ay.min) / max(1, ay.max - ay.min)
+                elif ev.type == e.EV_SYN and touching and x is not None and y is not None:
                     if down is None:
                         down = (x, y, time.time())
                         start = (x, y)
