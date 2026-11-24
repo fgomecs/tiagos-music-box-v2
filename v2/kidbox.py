@@ -502,6 +502,9 @@ class KidBox:
         self.press = None           # (pos, time) for swipe / long press
         self.quit_app = False
         self.bye = False
+        self.finger, self.finger_pos = None, (0, 0)   # finger used as "the mouse"
+        self.held = False                              # finger / mouse currently down
+        self.seen_events = set()
         self.dragging = False
         self.last_mirror = 0
         self.thumb_cache = {}
@@ -705,6 +708,34 @@ class KidBox:
 
     # ---- input
     def handle(self, ev):
+        if ev.type not in self.seen_events and len(self.seen_events) < 40:      # log what input we get
+            self.seen_events.add(ev.type)
+            print("input event:", pygame.event.event_name(ev.type), flush=True)
+        # Touch: without the desktop, SDL may deliver only FINGER events. Turn the first finger into
+        # mouse events (the whole app works with mouse events); ignore SDL's own touch->mouse copies
+        # so nothing happens twice. Draw still gets the raw finger events for multi-touch.
+        if ev.type in (pygame.FINGERDOWN, pygame.FINGERMOTION, pygame.FINGERUP):
+            if self.page == "play" and isinstance(self.activity, games.DrawPad):
+                self.activity.handle(ev)
+            pos = (int(ev.x * W), int(ev.y * H))
+            if ev.type == pygame.FINGERDOWN and self.finger is None:
+                self.finger, self.finger_pos = ev.finger_id, pos
+                return self.handle(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1, synthetic=True))
+            if ev.finger_id != self.finger:
+                return True
+            if ev.type == pygame.FINGERMOTION:
+                rel = (pos[0] - self.finger_pos[0], pos[1] - self.finger_pos[1])
+                self.finger_pos = pos
+                return self.handle(pygame.event.Event(pygame.MOUSEMOTION, pos=pos, rel=rel, buttons=(1, 0, 0), synthetic=True))
+            self.finger = None
+            return self.handle(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1, synthetic=True))
+        if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+            if getattr(ev, "touch", False):
+                return True                      # SDL's copy of a finger we already handled
+            if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                self.held = True
+            elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
+                self.held = False
         if ev.type == pygame.QUIT:
             return False
         if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE and os.environ.get("KIDBOX_WINDOW"):
@@ -1044,7 +1075,7 @@ class KidBox:
             self.t += dt
             for ev in pygame.event.get():
                 running = self.handle(ev) and running
-            if (self.press and self.page != "parent" and pygame.mouse.get_pressed()[0]
+            if (self.press and self.page != "parent" and self.held
                     and pygame.Rect(0, 0, 90, 90).collidepoint(self.press[0])
                     and now - self.press[1] > 5):           # hidden parent menu: hold top-left 5 s
                 self.press = None

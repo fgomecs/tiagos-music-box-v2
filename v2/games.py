@@ -100,7 +100,7 @@ def sfx(name):
 
 def touch_mouse(ev):
     """True if this mouse event was synthesised by SDL from a finger touch."""
-    return getattr(ev, "touch", False)
+    return getattr(ev, "touch", False) or getattr(ev, "synthetic", False)
 
 
 def heart(surf, c, s, color):
