@@ -10,3 +10,4 @@ __pycache__/
 v2/settings.json
 v2/.enabled
 v2/*.log
+v2/bin/
